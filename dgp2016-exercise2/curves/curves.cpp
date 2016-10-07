@@ -25,29 +25,84 @@ struct MainWindow : public TrackballWindow {
   // time step for smoothing
   double epsilon = 0.1;
 
-  MatMxN new_points;
-
-  void scale(MatMxN& old_points, MatMxN& new_points) {
-      double original_length = 0;
-      for (int i=0; i<num_points; i++){
-          original_length += (old_points.col(i) - old_points.col((i + 1) % num_points)).norm();
-      }
-      double new_length = 0;
-      for (int i=0; i<num_points; i++){
-          new_length += (new_points.col(i) - new_points.col((i + 1) % num_points)).norm();
-      }
-      for (int i=0; i<num_points; i++)
-          old_points.col(i) = new_points.col(i) * original_length / new_length;
+  double getCurveLength(OpenGP::MatMxN const & curve)
+  {
+	  double length = 0.0;
+	  
+	  for (auto i = 0; i < num_points; ++i)
+	  {
+		  // Compute the indices of the points which take part in the current length calculation.
+		  //
+		  // Due to the fact that the given curve is closed,
+		  // the indices can wrap at the edges of the points buffer.
+		  //
+		  auto const currentpoint_index = i;
+		  auto const nextpoint_index = (i + 1) % num_points;
+		  
+		  // Calculate the length of the current curve segment using the norm of the vector which
+		  // goes from the current point to the next one.
+		  //
+		  length += (curve.col(nextpoint_index) - curve.col(currentpoint_index)).norm();
+	  }
+	  
+	  return length;
   }
 
-  void laplacianSmoothing() {
-    // Curve Smoothing - centroid (this function should do one iteration of smoothing)
-    new_points = MatMxN::Zero(2, num_points);
-    for (int i=0; i<num_points; i++){
-        new_points.col(i) = points.col(i);
-        new_points.col(i) += epsilon * ((points.col((i + 1) % num_points) + points.col((i + num_points - 1) % num_points)) / 2 - points.col(i));
-    }
-    scale(points, new_points);
+  void laplacianSmoothing()
+  {
+	  // Initialize a matrix for the processed points with zeros.
+	  // Every column in the resulting matrix represents the coordinates of a certain point.
+	  //
+	  Eigen::Index const coords_count = 2;
+	  OpenGP::MatMxN smoothed_points = OpenGP::MatMxN::Zero(coords_count, num_points);
+	  
+	  
+	  //
+	  // Process the initial points into their corresponding "smoothed" versions.
+	  //
+	  // This will effectively fill the container for the smoothed points.
+	  //
+	  
+	  for (auto i = 0; i < num_points; ++i)
+	  {
+		  // Calculate the indices of both the previous and the next points.
+		  //
+		  // Due to the fact that the given curve is closed,
+		  // the indices can wrap at the edges of the points buffer.
+		  //
+		  auto const prevpoint_index = (i + num_points - 1) % num_points;
+		  auto const nextpoint_index = (i + 1) % num_points;
+		  
+		  // Calculate the center of the line that connects the previous point with the next one.
+		  //
+		  auto const line_center = (points.col(prevpoint_index) + points.col(nextpoint_index)) / 2.0;
+		  
+		  // Create a vector that points from the current point to the line center calculated above.
+		  //
+		  // The vector is scaled by the epsilon value.
+		  //
+		  auto const currentpoint_index = i;
+		  auto const currentpoint_direction = epsilon * (line_center - points.col(currentpoint_index));
+		  
+		  // Create a smoothed version of the current point.
+		  //
+		  smoothed_points.col(currentpoint_index) = points.col(currentpoint_index) + currentpoint_direction;
+	  }
+	  
+	  
+	  //
+	  // Update the initial points with their corresponding "smoothed" versions while preserving the initial curve length.
+	  //
+	  
+	  // Calculate the lengths of both the initial curve and the smoothed one.
+	  //
+	  auto const initialcurve_length = getCurveLength(points);
+	  auto const smoothedcurve_length = getCurveLength(smoothed_points);
+		  
+	  for (auto i = 0; i < num_points; ++i)
+	  {  
+		  points.col(i) = smoothed_points.col(i) * initialcurve_length / smoothedcurve_length;
+	  }
   }
 
   void osculatingCircle() {
