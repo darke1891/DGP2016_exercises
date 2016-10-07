@@ -7,5 +7,5 @@ file(GLOB_RECURSE SHADERS "*.glsl")
 add_executable (smoothing curves.cpp)
 target_link_libraries(smoothing ${LIBRARIES})
 
-add_executable (reconstruction reconstruction.cpp)
-target_link_libraries(reconstruction ${LIBRARIES})
+# add_executable (reconstruction reconstruction.cpp)
+# target_link_libraries(reconstruction ${LIBRARIES})
