@@ -23,16 +23,18 @@ struct MainWindow : public TrackballWindow {
     // Exercise 3 : fill the function below (see PDF for instructions)
     // To test your implementation, use the SPACE key
     // ============================================================================
+    /*
+    //If we can calculate Integral(k(s))ds Annalitically :
     double primitiveOfk(double s){
 
         //k(s) = 1
         //return s;
 
-        //k(s) = s²
-        //return s*s*s/3;
+        //k(s) = s
+        return s*s/2;
 
         //k(s) = s² - 2.19
-        return (s*s/3 - 2.19) * s;
+        //return (s*s/3 - 2.19) * s;
 
     }
     Vec2 tangentAt(double s){
@@ -44,15 +46,19 @@ struct MainWindow : public TrackballWindow {
     Vec2 deltaTangentAt(double s){
         return (tangentAt(s+epsilon)+tangentAt(s))/2 * epsilon;
     }
+    */
 
-
-    /*
     //If we can't have Integral(k(s))ds Annalitically :
     double k(double s) {
 
+        //k(s) = 1
         //return 1;
-        //return s*s;
-        return s*s - 2.19;
+
+        //k(s) = s
+        return s*s;
+
+        //k(s) = s² - 2.19
+        //return s*s - 2.19;
     }
 
     Vec2 deltaTangentAt(double s){
@@ -67,7 +73,6 @@ struct MainWindow : public TrackballWindow {
         return (prevT + tangent)/2*epsilon;
     }
 
-*/
     void reconstructCurveStep() {
         //every time you press space, a new point of the curve is added, so the number of points increases
         points.conservativeResize(2, points.cols() + 1);
@@ -103,8 +108,8 @@ struct MainWindow : public TrackballWindow {
 
         // First, second, third curve
         //points.col(0) = Vec2 (0, -1); // first
-        points.col (0) = Vec2 (0, 0.0); // second
-        // points.col (0) = Vec2 (0, 0.0); // third
+        //points.col (0) = Vec2 (0, 0.0); // second
+        points.col (0) = Vec2 (0, 0.0); // third
 
         tangent = Vec2 (1.0, 0.0);
 
