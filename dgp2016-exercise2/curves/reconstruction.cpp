@@ -4,6 +4,7 @@
 #include <OpenGP/GL/PointsRenderer.h>
 #include <OpenGP/GL/SegmentsRenderer.h>
 #include <random>
+#include <cmath>
 
 using namespace OpenGP;
 
@@ -22,10 +23,33 @@ struct MainWindow : public TrackballWindow {
 // Exercise 3 : fill the function below (see PDF for instructions)
 // To test your implementation, use the SPACE key
 // ============================================================================
+  double primitiveOfk(double s){
+
+    //k(s) = 1
+    return s;
+
+    //k(s) = s²
+    //return s*s*s/3;
+
+    //k(s) = s² - 2.19
+    //return (s*s/3 - 2.19) * s;
+
+  }
+  Vec2 tangentAt(double s){
+      double pks = primitiveOfk(s);
+      double sini = sin(pks);
+      double cosi = cos(pks);
+      return Vec2(cosi * tangent(0) - sini * tangent(1),sini * tangent(0) + cosi * tangent(1));
+  }
+
   void reconstructCurveStep() {
       //every time you press space, a new point of the curve is added, so the number of points increases
       points.conservativeResize(2, points.cols() + 1);
       int n = points.cols() - 1;
+      double s = n * epsilon;
+      Vec2 deltaTangente = (tangentAt(s+epsilon)+tangentAt(s))/2 * epsilon;
+      points.col(n) = deltaTangente+points.col(n-1);
+
   }
 // ============================================================================
 // END OF Exercise 2 (do not thouch the rest of the code except to uncomment
@@ -52,7 +76,7 @@ struct MainWindow : public TrackballWindow {
     points = MatMxN(2, 1);
 
     // First, second, third curve
-    points.col(0) = Vec2 (0, -1.0); // first
+    points.col(0) = Vec2 (0, -1); // first
     // points.col (0) = Vec2 (0, 0.0); // second
     // points.col (0) = Vec2 (0, 0.0); // third
 
