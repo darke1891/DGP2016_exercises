@@ -55,7 +55,7 @@ struct MainWindow : public TrackballWindow {
         //return 1;
 
         //k(s) = s
-        return s*s;
+        return s;
 
         //k(s) = s² - 2.19
         //return s*s - 2.19;
