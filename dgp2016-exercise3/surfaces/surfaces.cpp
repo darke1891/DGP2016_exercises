@@ -12,13 +12,7 @@ void computeValence(Surface_mesh * mesh)
 
     for (auto vertex : mesh->vertices())
     {
-        unsigned int valence = 0;
-
-        for (auto incident_vertex : mesh->vertices(vertex))
-        {
-            ++valence;
-        }
-        vertex_valence[vertex] = valence;
+        vertex_valence[vertex] = mesh->valence(vertex);
     }
 }
 
