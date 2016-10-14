@@ -8,13 +8,13 @@ using namespace surface_mesh;
 
 void computeValence(Surface_mesh * mesh)
 {
-    Surface_mesh::Vertex_property<unsigned int> vertex_valence = mesh->vertex_property<unsigned int>("v:valence");
+    Surface_mesh::Vertex_property<unsigned int> vertex_valence = mesh->vertex_property<unsigned int>("v:valence", 0);
 
-    for (auto const & vertex : mesh->vertices())
+    for (auto vertex : mesh->vertices())
     {
         unsigned int valence = 0;
 
-        for (auto const & incident_vertex : mesh->vertices(vertex))
+        for (auto incident_vertex : mesh->vertices(vertex))
         {
             ++valence;
         }
