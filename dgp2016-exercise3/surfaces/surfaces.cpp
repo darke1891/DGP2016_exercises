@@ -33,14 +33,21 @@ void computeNormalsWithConstantWeights(Surface_mesh * mesh)
     }
 }
 
-void computeNormalsByAreaWeights(Surface_mesh *mesh) {
+void computeNormalsByAreaWeights(Surface_mesh * mesh)
+{
     Point default_normal(0.0, 1.0, 0.0);
-    Surface_mesh::Vertex_property<Point> v_area_weights_n =
-            mesh->vertex_property<Point>("v:area_weight_n", default_normal);
+    Surface_mesh::Vertex_property<Point> v_area_weights_n = mesh->vertex_property<Point>("v:area_weight_n", default_normal);
 
-    // TODO TASK 3
-    // Compute the normals for each vertex v in the mesh using the weights proportionals
-    // to the areas technique (see .pdf) and store inside v_area_weights_n[v]
+    for (auto vertex : mesh->vertices())
+    {
+        Normal cumulative_normal(default_normal);
+
+        for (auto face : mesh->faces(vertex))
+        {
+            cumulative_normal += mesh->compute_face_normal(face);
+        }
+        v_area_weights_n[vertex] = cumulative_normal;
+    }
 }
 
 void computeNormalsWithAngleWeights(Surface_mesh *mesh) {
