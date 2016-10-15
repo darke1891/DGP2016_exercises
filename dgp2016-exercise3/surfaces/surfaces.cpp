@@ -50,14 +50,48 @@ void computeNormalsByAreaWeights(Surface_mesh * mesh)
     }
 }
 
-void computeNormalsWithAngleWeights(Surface_mesh *mesh) {
+void computeNormalsWithAngleWeights(Surface_mesh * mesh)
+{
     Point default_normal(0.0, 1.0, 0.0);
-    Surface_mesh::Vertex_property<Point> v_angle_weights_n =
-            mesh->vertex_property<Point>("v:angle_weight_n", default_normal);
+    Surface_mesh::Vertex_property<Point> v_angle_weights_n = mesh->vertex_property<Point>("v:angle_weight_n", default_normal);
 
-    // TODO TASK 4
-    // Compute the normals for each vertex v in the mesh using the weights proportionals
-    // to the angles technique (see .pdf) and store it inside v_angle_weights_n[v]
+    for (auto vertex : mesh->vertices())
+    {
+        Normal vertex_normal(default_normal);
+
+        auto initial_incident_vertex = mesh->vertices(vertex);
+        auto current_incident_vertex = initial_incident_vertex;
+
+        do
+        {
+            // Since we need two incident vertices to operate with, save
+            // the current vertex and then iterate it to the next one.
+            //
+            auto previous_incident_vertex = current_incident_vertex;
+            ++current_incident_vertex;
+
+            // Get the positions of the current face vertices,
+            // i.e. the position of the current vertex and the positions
+            // of the two incident vertices that together form a triangular face.
+            //
+            auto const p0 = mesh->position(vertex);
+            auto const p1 = mesh->position(*previous_incident_vertex);
+            auto const p2 = mesh->position(*current_incident_vertex);
+
+            // Get the vectors pointing from the current vertex to the incident vertices.
+            //
+            auto const a = p1 - p0;
+            auto const b = p2 - p0;
+
+            auto const incident_face_angle = acos(dot(a, b) / norm(a) * norm(b));
+            auto const incident_face_normal = cross(a, b).normalize();
+
+            vertex_normal += incident_face_angle * incident_face_normal;
+        }
+        while (current_incident_vertex != initial_incident_vertex);
+
+        v_angle_weights_n[vertex] = vertex_normal.normalize();
+    }
 }
 
 // #############################################################################
