@@ -40,13 +40,42 @@ void computeNormalsByAreaWeights(Surface_mesh * mesh)
 
     for (auto vertex : mesh->vertices())
     {
-        Normal cumulative_normal(default_normal);
+        Normal vertex_normal(default_normal);
 
-        for (auto face : mesh->faces(vertex))
+        auto initial_incident_vertex = mesh->vertices(vertex);
+        auto current_incident_vertex = initial_incident_vertex;
+
+        do
         {
-            cumulative_normal += mesh->compute_face_normal(face);
+            // Since we need two incident vertices to operate with, save
+            // the current vertex and then iterate it to the next one.
+            //
+            auto previous_incident_vertex = current_incident_vertex;
+            ++current_incident_vertex;
+
+            // Get the positions of the current face vertices,
+            // i.e. the position of the current vertex and the positions
+            // of the two incident vertices that together form a triangular face.
+            //
+            auto const p0 = mesh->position(vertex);
+            auto const p1 = mesh->position(*previous_incident_vertex);
+            auto const p2 = mesh->position(*current_incident_vertex);
+
+            // Get the vectors pointing from the current vertex to the incident vertices.
+            //
+            auto const a = p1 - p0;
+            auto const b = p2 - p0;
+
+            auto ab_cross_product = cross(a, b);
+
+            auto const incident_face_normal = ab_cross_product.normalize();
+            auto const incident_face_area = norm(ab_cross_product) / 2.0;
+
+            vertex_normal += incident_face_area * incident_face_normal;
         }
-        v_area_weights_n[vertex] = cumulative_normal;
+        while (current_incident_vertex != initial_incident_vertex);
+
+        v_area_weights_n[vertex] = vertex_normal.normalize();
     }
 }
 
