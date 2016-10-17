@@ -23,13 +23,13 @@ void computeNormalsWithConstantWeights(Surface_mesh * mesh)
 
     for (auto vertex : mesh->vertices())
     {
-        Normal cumulative_normal(default_normal);
+        Normal vertex_normal(default_normal);
 
         for (auto face : mesh->faces(vertex))
         {
-            cumulative_normal += mesh->compute_face_normal(face);
+            vertex_normal += mesh->compute_face_normal(face);
         }
-        v_cste_weights_n[vertex] = cumulative_normal.normalize();
+        v_cste_weights_n[vertex] = vertex_normal.normalize();
     }
 }
 
@@ -69,6 +69,14 @@ void computeNormalsByAreaWeights(Surface_mesh * mesh)
             auto ab_cross_product = cross(a, b);
 
             auto const incident_face_normal = ab_cross_product.normalize();
+
+            // Compute the area of the incident face.
+            //
+            // Since the norm of a cross product of two vectors is equal to
+            // the area of a parallelogram formed by these two vectors,
+            // we divide this norm by 2 to get the area of a triangle,
+            // the area of the incident triangular face.
+            //
             auto const incident_face_area = norm(ab_cross_product) / 2.0;
 
             vertex_normal += incident_face_area * incident_face_normal;
