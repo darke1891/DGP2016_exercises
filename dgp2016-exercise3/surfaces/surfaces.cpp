@@ -3,6 +3,7 @@
 //   Copyright Gaspard Zoss (C) 2016 Computer Graphics and Geometry Laboratory, EPFL
 //----------------------------------------------------------------------------------
 #include "viewer.h"
+#include <iostream>
 
 using namespace surface_mesh;
 
@@ -23,7 +24,7 @@ void computeNormalsWithConstantWeights(Surface_mesh * mesh)
 
     for (auto vertex : mesh->vertices())
     {
-        Normal vertex_normal(default_normal);
+        Normal vertex_normal(0.0, 0.0, 0.0);
 
         for (auto face : mesh->faces(vertex))
         {
@@ -40,7 +41,7 @@ void computeNormalsByAreaWeights(Surface_mesh * mesh)
 
     for (auto vertex : mesh->vertices())
     {
-        Normal vertex_normal(default_normal);
+        Normal vertex_normal(0.0, 0.0, 0.0);
 
         auto initial_incident_vertex = mesh->vertices(vertex);
         auto current_incident_vertex = initial_incident_vertex;
@@ -68,7 +69,6 @@ void computeNormalsByAreaWeights(Surface_mesh * mesh)
 
             auto ab_cross_product = cross(a, b);
 
-            auto const incident_face_normal = ab_cross_product.normalize();
 
             // Compute the area of the incident face.
             //
@@ -78,11 +78,13 @@ void computeNormalsByAreaWeights(Surface_mesh * mesh)
             // the area of the incident triangular face.
             //
             auto const incident_face_area = norm(ab_cross_product) / 2.0;
+            auto const incident_face_normal = ab_cross_product.normalize();
 
             vertex_normal += incident_face_area * incident_face_normal;
         }
         while (current_incident_vertex != initial_incident_vertex);
 
+        std::cout << std::endl;
         v_area_weights_n[vertex] = vertex_normal.normalize();
     }
 }
@@ -94,7 +96,7 @@ void computeNormalsWithAngleWeights(Surface_mesh * mesh)
 
     for (auto vertex : mesh->vertices())
     {
-        Normal vertex_normal(default_normal);
+        Normal vertex_normal(0.0, 0.0, 0.0);
 
         auto initial_incident_vertex = mesh->vertices(vertex);
         auto current_incident_vertex = initial_incident_vertex;
@@ -120,7 +122,7 @@ void computeNormalsWithAngleWeights(Surface_mesh * mesh)
             auto const a = p1 - p0;
             auto const b = p2 - p0;
 
-            auto const incident_face_angle = acos(dot(a, b) / norm(a) * norm(b));
+            auto const incident_face_angle = acos(dot(a, b) / norm(a) / norm(b));
             auto const incident_face_normal = cross(a, b).normalize();
 
             vertex_normal += incident_face_angle * incident_face_normal;

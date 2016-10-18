@@ -10,7 +10,7 @@
 #include <nanogui/label.h>
 #include <nanogui/button.h>
 #include <nanogui/tabwidget.h>
-#include <surface_mesh/Surface_Mesh.h>
+#include <surface_mesh/Surface_mesh.h>
 
 #include "trackball.h"
 
