@@ -84,7 +84,6 @@ void computeNormalsByAreaWeights(Surface_mesh * mesh)
         }
         while (current_incident_vertex != initial_incident_vertex);
 
-        std::cout << std::endl;
         v_area_weights_n[vertex] = vertex_normal.normalize();
     }
 }
