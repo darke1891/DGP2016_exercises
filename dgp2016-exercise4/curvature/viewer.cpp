@@ -93,7 +93,7 @@ void Viewer::calc_gauss_curvature() {
     // you pass to the acos function is between -1.0 and 1.0.
     // Use the v_weight property for the area weight.
     // ------------- IMPLEMENT HERE ---------
-    calc_weights();
+    calc_vertices_weights();
     for (auto vertex: mesh.vertices()) {
         if (mesh.is_boundary(vertex))
             continue;
@@ -140,6 +140,7 @@ void Viewer::uniform_smooth(unsigned int n_iters) {
         }
 
     }
+    delete []Lu;
 
     // update face and vertex normals
     mesh.update_face_normals();
