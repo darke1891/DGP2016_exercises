@@ -151,6 +151,8 @@ void Viewer::uniform_smooth(unsigned int n_iters) {
 // ========================================================================
 void Viewer::smooth(unsigned int n_iters) {
 
+    Mesh::Edge_property<Scalar> e_weight = mesh.edge_property<Scalar>("e:weight", 0);
+    Vec3 *Lu = new Vec3[mesh.vertices_size()];
     for (unsigned int iter=0; iter<n_iters; ++iter) {
         // ------------- IMPLEMENT HERE ---------
         // Perform Laplace-Beltrami smoothing:
@@ -158,7 +160,28 @@ void Viewer::smooth(unsigned int n_iters) {
         // 2) for each non-boundary vertex, update its position using the normalized Laplace-Beltrami operator
         //    (Hint: use the precomputed edge weights in the edge property "e:weight")
         // ------------- IMPLEMENT HERE ---------
+        calc_edges_weights();
+        for (auto vertex: mesh.vertices()) {
+            Lu[vertex.idx()] = Vec3(0, 0, 0);
+            if (mesh.is_boundary(vertex))
+                continue;
+            int n = mesh.valence(vertex);
+            if (n == 0)
+                continue;
+            Scalar weight_sum = 0;
+            for (auto halfedge: mesh.halfedges(vertex)) {
+                auto edge = mesh.edge(halfedge);
+                auto neighbor = mesh.to_vertex(halfedge);
+                Lu[vertex.idx()] += e_weight[edge] * (mesh.position(neighbor) - mesh.position(vertex));
+                weight_sum += e_weight[edge];
+            }
+            Lu[vertex.idx()] /= weight_sum * 2;
+        }
+        for (auto vertex: mesh.vertices()) {
+            mesh.position(vertex) += Lu[vertex.idx()];
+        }
     }
+    delete []Lu;
 
 
     // update face and vertex normals
