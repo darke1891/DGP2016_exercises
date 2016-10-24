@@ -225,6 +225,19 @@ void Viewer::laplace_beltrami_enhance_feature(int enhancement_smoothing_iteratio
     // 2) update the vertex positions according to the difference between the original and the smoothed mesh,
     //    using enhancement_coef as the value of alpha in the feature enhancement formula
     // ------------- IMPLEMENT HERE ---------
+    Vec3 *Lu = new Vec3[mesh.vertices_size()];
+
+    for (auto vertex: mesh.vertices()){
+        Lu[vertex.idx()] = mesh.position(vertex);
+    }
+    smooth(enhancement_smoothing_iterations);
+    for (auto vertex: mesh.vertices()){
+        mesh.position(vertex) += enhancement_coef *( Lu[vertex.idx()] - mesh.position(vertex));
+    }
+    delete[] Lu;
+
+    mesh.update_face_normals();
+    mesh.update_vertex_normals();
     mesh.update_face_normals();
     mesh.update_vertex_normals();
 }
