@@ -12,6 +12,7 @@
 //-----------------------------------------------------------------------------
 #include "viewer.h"
 #include <surface_mesh/Surface_mesh.h>
+#include <complex>
 
 using std::min;
 using std::max;
@@ -108,7 +109,8 @@ void Viewer::calc_gauss_curvature() {
                 else
                     l[2] = mesh.edge_length(mesh.edge(face_edge));
             }
-            sum -= acos((l[0] * l[0] + l[1] * l[1] - l[2] * l[2]) / 2 / l[0] / l[1]);
+            std::complex<double> z((l[0] * l[0] + l[1] * l[1] - l[2] * l[2]) / 2 / l[0] / l[1], 0);
+            sum -= acos(z).real();
         }
         v_gauss_curvature[vertex] = sum * 2 * v_weight[vertex];
     }
