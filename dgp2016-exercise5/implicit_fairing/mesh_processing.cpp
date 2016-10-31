@@ -52,20 +52,28 @@ void MeshProcessing::implicit_smoothing(const double timestep) {
     // ========================================================================
     // TODO: IMPLEMENTATION FOR EXERCISE 5.1 HERE
     // ========================================================================
-
     for (auto vertex: mesh_.vertices()) {
             auto areaInvInv = 1 / area_inv[vertex];
-            triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),areaInvInv));
-
-            for (auto h: mesh_.halfedges(vertex)){
-                auto d = timestep * cotan[mesh_.edge(h)];
-                auto vertex2 = mesh_.to_vertex(h);
-                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex2.idx(), -d));
-                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(), d));
-            }
-
             auto vertex_position = mesh_.position(vertex);
-            B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]) * areaInvInv;
+            if (mesh_.is_boundary(vertex)) {
+                B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]);
+                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),1));
+            }
+            else {
+                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),areaInvInv));
+                B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]) * areaInvInv;
+                for (auto h: mesh_.halfedges(vertex)){
+                    auto d = timestep * cotan[mesh_.edge(h)];
+                    auto vertex2 = mesh_.to_vertex(h);
+                    if (mesh_.is_boundary(vertex2)){
+                        auto vertex2_position = mesh_.position(vertex2);
+                        B.row(vertex.idx()) += Eigen::RowVector3d(vertex2_position[0], vertex2_position[1], vertex2_position[2]) * d;
+                    }
+                    else
+                        triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex2.idx(), -d));
+                    triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(), d));
+                }
+            }
         }
 
 
@@ -74,7 +82,15 @@ void MeshProcessing::implicit_smoothing(const double timestep) {
 
     // solve A*X = B
     Eigen::SimplicialLDLT< Eigen::SparseMatrix<double> > solver(A);
+    if (solver.info () != Eigen::Success) {
+        printf("linear solver init failed.\n");
+    }
+
     Eigen::MatrixXd X = solver.solve(B);
+
+    if (solver.info () != Eigen::Success) {
+        printf("linear solver failed.\n");
+    }
 
     // copy solution
     for (int i = 0; i < n; ++i)
