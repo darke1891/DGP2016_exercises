@@ -54,16 +54,18 @@ void MeshProcessing::implicit_smoothing(const double timestep) {
     // ========================================================================
 
     for (auto vertex: mesh_.vertices()) {
-            auto areaInvInv = 1/area_inv[vertex];
-            triplets.push_back(Triplet<double>(vertex.idx(),vertex.idx(),areaInvInv));
+            auto areaInvInv = 1 / area_inv[vertex];
+            triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),areaInvInv));
 
-            for (auto h: mesh_.halfedge(vertex)){
+            for (auto h: mesh_.halfedges(vertex)){
                 auto d = timestep * cotan[mesh_.edge(h)];
-                triplets.push_back(Triplet(vertex.idx(),vertex2.idx(),-d));
-                triplets.push_back(Triplet(vertex.idx(),vertex.idx(),-d));
+                auto vertex2 = mesh_.to_vertex(h);
+                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex2.idx(), -d));
+                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(), d));
             }
 
-            B[vertex.idx()] = mesh_.position(vertex) * areaInvInv;
+            auto vertex_position = mesh_.position(vertex);
+            B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]) * areaInvInv;
         }
 
 
