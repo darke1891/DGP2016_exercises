@@ -53,6 +53,20 @@ void MeshProcessing::implicit_smoothing(const double timestep) {
     // TODO: IMPLEMENTATION FOR EXERCISE 5.1 HERE
     // ========================================================================
 
+    for (auto vertex: mesh_.vertices()) {
+            auto areaInvInv = 1/area_inv[vertex];
+            triplets.push_back(Triplet<double>(vertex.idx(),vertex.idx(),areaInvInv));
+
+            for (auto h: mesh_.halfedge(vertex)){
+                auto d = timestep * cotan[mesh_.edge(h)];
+                triplets.push_back(Triplet(vertex.idx(),vertex2.idx(),-d));
+                triplets.push_back(Triplet(vertex.idx(),vertex.idx(),-d));
+            }
+
+            B[vertex.idx()] = mesh_.position(vertex) * areaInvInv;
+        }
+
+
     // build sparse matrix from triplets
     A.setFromTriplets(triplets.begin(), triplets.end());
 
