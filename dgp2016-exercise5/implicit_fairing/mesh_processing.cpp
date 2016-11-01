@@ -11,6 +11,11 @@
 //
 //-----------------------------------------------------------------------------
 #include "mesh_processing.h"
+
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
+
 #include <set>
 
 namespace mesh_processing {
@@ -18,6 +23,7 @@ namespace mesh_processing {
 using surface_mesh::Point;
 using surface_mesh::Scalar;
 using surface_mesh::Color;
+using surface_mesh::Vec3;
 using std::min;
 using std::max;
 using std::cout;
@@ -53,44 +59,35 @@ void MeshProcessing::implicit_smoothing(const double timestep) {
     // TODO: IMPLEMENTATION FOR EXERCISE 5.1 HERE
     // ========================================================================
     for (auto vertex: mesh_.vertices()) {
-            auto areaInvInv = 1 / area_inv[vertex];
-            auto vertex_position = mesh_.position(vertex);
-            if (mesh_.is_boundary(vertex)) {
-                B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]);
-                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),1));
-            }
-            else {
-                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),areaInvInv));
-                B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]) * areaInvInv;
-                for (auto h: mesh_.halfedges(vertex)){
-                    auto d = timestep * cotan[mesh_.edge(h)];
-                    auto vertex2 = mesh_.to_vertex(h);
-                    if (mesh_.is_boundary(vertex2)){
-                        auto vertex2_position = mesh_.position(vertex2);
-                        B.row(vertex.idx()) += Eigen::RowVector3d(vertex2_position[0], vertex2_position[1], vertex2_position[2]) * d;
+                auto areaInvInv = 1 / area_inv[vertex];
+                auto vertex_position = mesh_.position(vertex);
+                if (mesh_.is_boundary(vertex)) {
+                    B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]);
+                    triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),1));
+                }
+                else {
+                    triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),areaInvInv));
+                    B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]) * areaInvInv;
+                    for (auto h: mesh_.halfedges(vertex)){
+                        auto d = timestep * cotan[mesh_.edge(h)];
+                        auto vertex2 = mesh_.to_vertex(h);
+                        if (mesh_.is_boundary(vertex2)){
+                            auto vertex2_position = mesh_.position(vertex2);
+                            B.row(vertex.idx()) += Eigen::RowVector3d(vertex2_position[0], vertex2_position[1], vertex2_position[2]) * d;
+                        }
+                        else
+                            triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex2.idx(), -d));
+                        triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(), d));
                     }
-                    else
-                        triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex2.idx(), -d));
-                    triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(), d));
                 }
             }
-        }
-
 
     // build sparse matrix from triplets
     A.setFromTriplets(triplets.begin(), triplets.end());
 
     // solve A*X = B
     Eigen::SimplicialLDLT< Eigen::SparseMatrix<double> > solver(A);
-    if (solver.info () != Eigen::Success) {
-        printf("linear solver init failed.\n");
-    }
-
     Eigen::MatrixXd X = solver.solve(B);
-
-    if (solver.info () != Eigen::Success) {
-        printf("linear solver failed.\n");
-    }
 
     // copy solution
     for (int i = 0; i < n; ++i)
@@ -161,6 +158,18 @@ void MeshProcessing::calc_uniform_mean_curvature() {
     Mesh::Vertex_property<Scalar> v_unicurvature =
             mesh_.vertex_property<Scalar>("v:unicurvature", 0.0f);
     // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
+    for (auto vertex: mesh_.vertices()) {
+            if (mesh_.is_boundary(vertex))
+                continue;
+            int n = mesh_.valence(vertex);
+            if (n == 0)
+                continue;
+            Vec3 v_sum(0,0,0);
+            for (auto neighbor_vertex: mesh_.vertices(vertex))
+                v_sum += mesh_.position(neighbor_vertex) - mesh_.position(vertex);
+            v_sum /= n;
+            v_unicurvature[vertex] = norm(v_sum) / 2;
+        }
 }
 
 void MeshProcessing::calc_mean_curvature() {
@@ -171,6 +180,22 @@ void MeshProcessing::calc_mean_curvature() {
     Mesh::Vertex_property<Scalar>  v_weight =
             mesh_.vertex_property<Scalar>("v:weight", 0.0f);
     // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
+    calc_weights();
+        for (auto vertex: mesh_.vertices()) {
+            if (mesh_.is_boundary(vertex))
+                continue;
+            int n = mesh_.valence(vertex);
+            if (n == 0)
+                continue;
+            Vec3 v_sum(0,0,0);
+            for (auto halfedge: mesh_.halfedges(vertex)) {
+                auto edge = mesh_.edge(halfedge);
+                auto neighbor = mesh_.to_vertex(halfedge);
+                v_sum += e_weight[edge] * (mesh_.position(neighbor) - mesh_.position(vertex));
+            }
+            v_sum *= v_weight[vertex];
+            v_curvature[vertex] = norm(v_sum);
+        }
 }
 
 void MeshProcessing::calc_gauss_curvature() {
@@ -179,30 +204,127 @@ void MeshProcessing::calc_gauss_curvature() {
     Mesh::Vertex_property<Scalar> v_weight =
             mesh_.vertex_property<Scalar>("v:weight", 0.0f);
     // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
+    calc_vertices_weights();
+        for (auto vertex: mesh_.vertices()) {
+            if (mesh_.is_boundary(vertex))
+                continue;
+            Scalar sum = 2 * M_PI;
+            for (auto face: mesh_.faces(vertex)) {
+                Scalar l[3];
+                for (auto face_edge: mesh_.halfedges(face)){
+                    if (mesh_.to_vertex(face_edge) == vertex)
+                        l[0] = mesh_.edge_length(mesh_.edge(face_edge));
+                    else if (mesh_.from_vertex(face_edge) == vertex)
+                        l[1] = mesh_.edge_length(mesh_.edge(face_edge));
+                    else
+                        l[2] = mesh_.edge_length(mesh_.edge(face_edge));
+                }
+                std::complex<double> z((l[0] * l[0] + l[1] * l[1] - l[2] * l[2]) / 2 / l[0] / l[1], 0);
+                sum -= acos(z).real();
+            }
+            v_gauss_curvature[vertex] = sum * 2 * v_weight[vertex];
+        }
 }
 
 void MeshProcessing::uniform_smooth(const unsigned int iterations) {
 
-    for (unsigned int iter=0; iter<iterations; ++iter) {
-    // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
-    }
+    Vec3 *Lu = new Vec3[mesh_.vertices_size()];
+        for (unsigned int iter = 0; iter < iterations; ++iter) {
+            for (auto vertex: mesh_.vertices()) {
+                Lu[vertex.idx()] = Vec3(0, 0, 0);
+                if (mesh_.is_boundary(vertex))
+                    continue;
+                int n = mesh_.valence(vertex);
+                if (n == 0)
+                    continue;
+                for (auto neighbor_vertex: mesh_.vertices(vertex))
+                    Lu[vertex.idx()] += mesh_.position(neighbor_vertex) - mesh_.position(vertex);
+                Lu[vertex.idx()] /= n * 2;
+            }
+            for (auto vertex: mesh_.vertices()) {
+                mesh_.position(vertex) += Lu[vertex.idx()];
+            }
+
+        }
+        delete []Lu;
+
+        // update face and vertex normals
+        mesh_.update_face_normals();
+        mesh_.update_vertex_normals();
 }
 
 void MeshProcessing::smooth(const unsigned int iterations) {
 
-    for (unsigned int iter=0; iter<iterations; ++iter) {
-    // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
-    }
+    Mesh::Edge_property<Scalar> e_weight = mesh_.edge_property<Scalar>("e:weight", 0);
+        Vec3 *Lu = new Vec3[mesh_.vertices_size()];
+
+        for (unsigned int iter=0; iter < iterations; ++iter) {
+
+            calc_edges_weights();
+            for (auto vertex: mesh_.vertices()) {
+                Lu[vertex.idx()] = Vec3(0, 0, 0);
+                if (mesh_.is_boundary(vertex))
+                    continue;
+                int n = mesh_.valence(vertex);
+                if (n == 0)
+                    continue;
+                Scalar weight_sum = 0;
+                for (auto halfedge: mesh_.halfedges(vertex)) {
+                    auto edge = mesh_.edge(halfedge);
+                    auto neighbor = mesh_.to_vertex(halfedge);
+                    Lu[vertex.idx()] += e_weight[edge] * (mesh_.position(neighbor) - mesh_.position(vertex));
+                    weight_sum += e_weight[edge];
+                }
+                Lu[vertex.idx()] /= weight_sum * 2;
+            }
+            for (auto vertex: mesh_.vertices()) {
+                mesh_.position(vertex) += Lu[vertex.idx()];
+            }
+        }
+        delete []Lu;
+
+
+        // update face and vertex normals
+        mesh_.update_face_normals();
+        mesh_.update_vertex_normals();
 }
 
 void MeshProcessing::uniform_laplacian_enhance_feature(const unsigned int iterations,
                                                        const unsigned int coefficient) {
     // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
+    Vec3 *Lu = new Vec3[mesh_.vertices_size()];
+
+        for (auto vertex: mesh_.vertices()){
+            Lu[vertex.idx()] = mesh_.position(vertex);
+        }
+        uniform_smooth(iterations);
+        for (auto vertex: mesh_.vertices()){
+            mesh_.position(vertex) += coefficient *( Lu[vertex.idx()] - mesh_.position(vertex));
+        }
+        delete[] Lu;
+
+        mesh_.update_face_normals();
+        mesh_.update_vertex_normals();
 }
 
 void MeshProcessing::laplace_beltrami_enhance_feature(const unsigned int iterations,
                                                       const unsigned int coefficient) {
     // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
+    Vec3 *Lu = new Vec3[mesh_.vertices_size()];
+
+        for (auto vertex: mesh_.vertices()){
+            Lu[vertex.idx()] = mesh_.position(vertex);
+        }
+        smooth(iterations);
+        for (auto vertex: mesh_.vertices()){
+            mesh_.position(vertex) += coefficient *( Lu[vertex.idx()] - mesh_.position(vertex));
+        }
+        delete[] Lu;
+
+        mesh_.update_face_normals();
+        mesh_.update_vertex_normals();
+        mesh_.update_face_normals();
+        mesh_.update_vertex_normals();
 }
 
 void MeshProcessing::calc_weights() {
