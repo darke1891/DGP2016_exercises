@@ -132,29 +132,19 @@ void MeshProcessing::minimal_surface() {
     // TODO: IMPLEMENTATION FOR EXERCISE 5.2 HERE
     // ========================================================================
 
-    std::vector< Eigen::Triplet<double> > triplets;
-
-    // ========================================================================
-    // TODO: IMPLEMENTATION FOR EXERCISE 5.1 HERE
-    // ========================================================================
-    for (const auto &vertex: mesh_.vertices()) {
-        auto areaInv = 1 / area_inv[vertex];
-
-
+    for (auto vertex: mesh_.vertices()) {
+        auto areaInv = area_inv[vertex];
+        auto vertex_position = mesh_.position(vertex);
         if (mesh_.is_boundary(vertex)) {
-            auto vertex_position = mesh_.position(vertex);
-            rhs.row(vertex.idx()) << vertex_position[0], vertex_position[1], vertex_position[2];
-            triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),1));
-
+            rhs.row(vertex.idx()) = Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]);
+            triplets_L.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),1));
         }
         else {
-            triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),areaInv));
             for (auto h: mesh_.halfedges(vertex)){
-                auto d =  cotan[mesh_.edge(h)];
+                auto d =  cotan[mesh_.edge(h)] * areaInv;
                 auto vertex2 = mesh_.to_vertex(h);
-                if (!mesh_.is_boundary(vertex2))
-                    triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex2.idx(), -d * areaInv));
-                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(), d * areaInv));
+                triplets_L.push_back(Eigen::Triplet<double>(vertex.idx(),vertex2.idx(), -d));
+                triplets_L.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(), d));
             }
         }
     }
