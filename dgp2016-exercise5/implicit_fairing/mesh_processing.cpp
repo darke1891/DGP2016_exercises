@@ -137,10 +137,15 @@ void MeshProcessing::minimal_surface() {
     // ========================================================================
     // TODO: IMPLEMENTATION FOR EXERCISE 5.1 HERE
     // ========================================================================
-    for (auto vertex: mesh_.vertices()) {
+    for (const auto &vertex: mesh_.vertices()) {
         auto areaInv = 1 / area_inv[vertex];
+
+
         if (mesh_.is_boundary(vertex)) {
+            auto vertex_position = mesh_.position(vertex);
+            rhs.row(vertex.idx()) << vertex_position[0], vertex_position[1], vertex_position[2];
             triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),1));
+
         }
         else {
             triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),areaInv));
