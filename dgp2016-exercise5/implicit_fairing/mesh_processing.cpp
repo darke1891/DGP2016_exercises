@@ -53,28 +53,28 @@ void MeshProcessing::implicit_smoothing(const double timestep) {
     // TODO: IMPLEMENTATION FOR EXERCISE 5.1 HERE
     // ========================================================================
     for (auto vertex: mesh_.vertices()) {
-            auto areaInvInv = 1 / area_inv[vertex];
-            auto vertex_position = mesh_.position(vertex);
-            if (mesh_.is_boundary(vertex)) {
-                B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]);
-                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),1));
-            }
-            else {
-                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),areaInvInv));
-                B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]) * areaInvInv;
-                for (auto h: mesh_.halfedges(vertex)){
-                    auto d = timestep * cotan[mesh_.edge(h)];
-                    auto vertex2 = mesh_.to_vertex(h);
-                    if (mesh_.is_boundary(vertex2)){
-                        auto vertex2_position = mesh_.position(vertex2);
-                        B.row(vertex.idx()) += Eigen::RowVector3d(vertex2_position[0], vertex2_position[1], vertex2_position[2]) * d;
-                    }
-                    else
-                        triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex2.idx(), -d));
-                    triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(), d));
+        auto areaInvInv = 1 / area_inv[vertex];
+        auto vertex_position = mesh_.position(vertex);
+        if (mesh_.is_boundary(vertex)) {
+            B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]);
+            triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),1));
+        }
+        else {
+            triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),areaInvInv));
+            B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]) * areaInvInv;
+            for (auto h: mesh_.halfedges(vertex)){
+                auto d = timestep * cotan[mesh_.edge(h)];
+                auto vertex2 = mesh_.to_vertex(h);
+                if (mesh_.is_boundary(vertex2)){
+                    auto vertex2_position = mesh_.position(vertex2);
+                    B.row(vertex.idx()) += Eigen::RowVector3d(vertex2_position[0], vertex2_position[1], vertex2_position[2]) * d;
                 }
+                else
+                    triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex2.idx(), -d));
+                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(), d));
             }
         }
+    }
 
 
     // build sparse matrix from triplets
@@ -132,6 +132,27 @@ void MeshProcessing::minimal_surface() {
     // TODO: IMPLEMENTATION FOR EXERCISE 5.2 HERE
     // ========================================================================
 
+    std::vector< Eigen::Triplet<double> > triplets;
+
+    // ========================================================================
+    // TODO: IMPLEMENTATION FOR EXERCISE 5.1 HERE
+    // ========================================================================
+    for (auto vertex: mesh_.vertices()) {
+        auto areaInv = 1 / area_inv[vertex];
+        if (mesh_.is_boundary(vertex)) {
+            triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),1));
+        }
+        else {
+            triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),areaInv));
+            for (auto h: mesh_.halfedges(vertex)){
+                auto d =  cotan[mesh_.edge(h)];
+                auto vertex2 = mesh_.to_vertex(h);
+                if (!mesh_.is_boundary(vertex2))
+                    triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex2.idx(), -d * areaInv));
+                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(), d * areaInv));
+            }
+        }
+    }
     L.setFromTriplets (triplets_L.begin (), triplets_L.end ());
 
     // solve A*X = B
@@ -184,14 +205,14 @@ void MeshProcessing::calc_gauss_curvature() {
 void MeshProcessing::uniform_smooth(const unsigned int iterations) {
 
     for (unsigned int iter=0; iter<iterations; ++iter) {
-    // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
+        // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
     }
 }
 
 void MeshProcessing::smooth(const unsigned int iterations) {
 
     for (unsigned int iter=0; iter<iterations; ++iter) {
-    // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
+        // ------------- COPY YOUR FUNCTION FROM EXERCISE 4 ---------
     }
 }
 
@@ -378,34 +399,34 @@ void MeshProcessing::compute_mesh_properties() {
     j = 0;
     for (auto v: mesh_.vertices()) {
         points_.col(j) << mesh_.position(v).x,
-                          mesh_.position(v).y,
-                          mesh_.position(v).z;
+                mesh_.position(v).y,
+                mesh_.position(v).z;
 
         normals_.col(j) << vertex_normal[v].x,
-                           vertex_normal[v].y,
-                           vertex_normal[v].z;
+                vertex_normal[v].y,
+                vertex_normal[v].z;
 
         color_valence_.col(j) << v_color_valence[v].x,
-                                 v_color_valence[v].y,
-                                 v_color_valence[v].z;
+                v_color_valence[v].y,
+                v_color_valence[v].z;
 
         color_unicurvature_.col(j) << v_color_unicurvature[v].x,
-                                      v_color_unicurvature[v].y,
-                                      v_color_unicurvature[v].z;
+                v_color_unicurvature[v].y,
+                v_color_unicurvature[v].z;
 
         color_curvature_.col(j) << v_color_curvature[v].x,
-                                   v_color_curvature[v].y,
-                                   v_color_curvature[v].z;
+                v_color_curvature[v].y,
+                v_color_curvature[v].z;
 
         color_gaussian_curv_.col(j) << v_color_gaussian_curv[v].x,
-                                       v_color_gaussian_curv[v].y,
-                                       v_color_gaussian_curv[v].z;
+                v_color_gaussian_curv[v].y,
+                v_color_gaussian_curv[v].z;
         ++j;
     }
 }
 
 void MeshProcessing::color_coding(Mesh::Vertex_property<Scalar> prop, Mesh *mesh,
-                  Mesh::Vertex_property<Color> color_prop, int bound) {
+                                  Mesh::Vertex_property<Color> color_prop, int bound) {
     // Get the value array
     std::vector<Scalar> values = prop.vector();
 
@@ -423,7 +444,7 @@ void MeshProcessing::color_coding(Mesh::Vertex_property<Scalar> prop, Mesh *mesh
 }
 
 void MeshProcessing::set_color(Mesh::Vertex v, const Color& col,
-               Mesh::Vertex_property<Color> color_prop)
+                               Mesh::Vertex_property<Color> color_prop)
 {
     color_prop[v] = col;
 }
