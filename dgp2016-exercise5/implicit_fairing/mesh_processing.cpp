@@ -49,29 +49,72 @@ void MeshProcessing::implicit_smoothing(const double timestep) {
     // nonzero elements of A as triplets: (row, column, value)
     std::vector< Eigen::Triplet<double> > triplets;
 
-    // ========================================================================
-    // TODO: IMPLEMENTATION FOR EXERCISE 5.1 HERE
-    // ========================================================================
-    for (auto vertex: mesh_.vertices()) {
+    // Build matrices A and B.
+    //
+    for (auto vertex : mesh_.vertices())
+    {
         auto areaInvInv = 1 / area_inv[vertex];
         auto vertex_position = mesh_.position(vertex);
-        if (mesh_.is_boundary(vertex)) {
+
+        if (mesh_.is_boundary(vertex))
+        {
+            // Boundary vertices are special, they must be left intact.
+            //
+            // Therefore, matrix B receives an unmodified vertex position, and
+            // matrix A stores a simple identity operation in the correspoding cell.
+            //
             B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]);
-            triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),1));
+            triplets.push_back(Eigen::Triplet<double>(vertex.idx(), vertex.idx(), 1));
         }
-        else {
-            triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),areaInvInv));
+        else
+        {
+            // Since we do not store matrices D and M explicitly to form matrix A,
+            // we combine the matrix subtraction (D^-1 - lambda*M) directly into
+            // the triplets which later will be used to create matrix A.
+            //
+            // Here we start by putting the inverse of the area weight of the current
+            // vertex on the main diagonal of the future matrix A.
+            //
+            triplets.push_back(Eigen::Triplet<double>(vertex.idx(), vertex.idx(), areaInvInv));
+
+            // Update the B matrix by the coordinates of the current vertex multiplied by the area coefficient.
+            //
+            // This multiplication is the same operation as if we had a separate
+            // inverted diagonal matrix D multiplied by a "column vector" of points.
+            //
             B.row(vertex.idx()) =  Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]) * areaInvInv;
-            for (auto h: mesh_.halfedges(vertex)){
-                auto d = timestep * cotan[mesh_.edge(h)];
-                auto vertex2 = mesh_.to_vertex(h);
-                if (mesh_.is_boundary(vertex2)){
-                    auto vertex2_position = mesh_.position(vertex2);
-                    B.row(vertex.idx()) += Eigen::RowVector3d(vertex2_position[0], vertex2_position[1], vertex2_position[2]) * d;
+
+            // Loop through the one-ring neighbors of the current vertex.
+            //
+            for (auto h : mesh_.halfedges(vertex))
+            {
+                // Here we immediately mupliply the weight of the current edge
+                // by the timestep, i.e. the lambda.
+                //
+                auto scaled_edgeweight = timestep * cotan[mesh_.edge(h)];
+
+                auto neighbor_vertex = mesh_.to_vertex(h);
+
+                if (mesh_.is_boundary(neighbor_vertex))
+                {
+                    auto neighbor_position = mesh_.position(neighbor_vertex);
+                    B.row(vertex.idx()) += Eigen::RowVector3d(neighbor_position[0], neighbor_position[1], neighbor_position[2]) * scaled_edgeweight;
                 }
                 else
-                    triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex2.idx(), -d));
-                triplets.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(), d));
+                {
+                    // For elements of matrix A that are not on the main diagonal we put a negative weight of
+                    // the current edge in the future matrix A using a corresponding triplet. The negation of
+                    // the weight comes from the fact that when subtracting from matrix D^-1 we subtract from
+                    // zero elements of this matrix (remember, that D is a diagonal matrix), hence the negative sign.
+                    //
+                    triplets.push_back(Eigen::Triplet<double>(vertex.idx(), neighbor_vertex.idx(), -scaled_edgeweight));
+                }
+
+                // Since the resulting matrix A is a subtraction operation between matrices D^-1 and lambda*M,
+                // and the elements on the main diagonal of matrix M are the negative sum of neighboring edge
+                // weights, we perform addition here (two minuses is a plus).
+                //
+                triplets.push_back(Eigen::Triplet<double>(vertex.idx(), vertex.idx(), scaled_edgeweight));
             }
         }
     }
