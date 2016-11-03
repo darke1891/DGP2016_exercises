@@ -171,26 +171,49 @@ void MeshProcessing::minimal_surface() {
     // nonzero elements of A as triplets: (row, column, value)
     std::vector< Eigen::Triplet<double> > triplets_L;
 
-    // ========================================================================
-    // TODO: IMPLEMENTATION FOR EXERCISE 5.2 HERE
-    // ========================================================================
-
-    for (auto vertex: mesh_.vertices()) {
+    // Build matrix A and update matrix B if necessary.
+    //
+    for (auto vertex : mesh_.vertices())
+    {
         auto areaInv = area_inv[vertex];
         auto vertex_position = mesh_.position(vertex);
-        if (mesh_.is_boundary(vertex)) {
+
+        if (mesh_.is_boundary(vertex))
+        {
+            // Boundary vertices are special, they must be left intact.
+            //
+            // Therefore, the corresponding cell in matrix B receives the
+            // vertex position to signify that this vertex does not move,
+            // and matrix A stores a simple identity operation in the correspoding cell.
+            //
             rhs.row(vertex.idx()) = Eigen::RowVector3d(vertex_position[0], vertex_position[1], vertex_position[2]);
-            triplets_L.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(),1));
+            triplets_L.push_back(Eigen::Triplet<double>(vertex.idx(), vertex.idx(), 1));
         }
-        else {
-            for (auto h: mesh_.halfedges(vertex)){
-                auto d =  cotan[mesh_.edge(h)] * areaInv;
-                auto vertex2 = mesh_.to_vertex(h);
-                triplets_L.push_back(Eigen::Triplet<double>(vertex.idx(),vertex2.idx(), -d));
-                triplets_L.push_back(Eigen::Triplet<double>(vertex.idx(),vertex.idx(), d));
+        else
+        {
+            // Loop through the one-ring neighbors of the current vertex.
+            //
+            for (auto incident_halfedge : mesh_.halfedges(vertex))
+            {
+                // Since the resulting A matrix is the product of DM,
+                // and matrix D is a diagonal matrix with area weights of the vertices on its diagonal,
+                // then immediately scale the elements in matrix M by these area weights, i.e. basically scale
+                // the current edge weight.
+                //
+                auto scaled_edgeweight =  cotan[mesh_.edge(incident_halfedge)] * areaInv;
+
+                auto neighbor_vertex = mesh_.to_vertex(incident_halfedge);
+
+                // Having scaled the current edge weight we can update the future matrix A.
+                // The main diagonal will receive a negative sum of scaled edge weights,
+                // while the non-diagonal elements will receive the corresponding positive edge weight.
+                //
+                triplets_L.push_back(Eigen::Triplet<double>(vertex.idx(), neighbor_vertex.idx(), scaled_edgeweight));
+                triplets_L.push_back(Eigen::Triplet<double>(vertex.idx(), vertex.idx(), -scaled_edgeweight));
             }
         }
     }
+    
     L.setFromTriplets (triplets_L.begin (), triplets_L.end ());
 
     // solve A*X = B
