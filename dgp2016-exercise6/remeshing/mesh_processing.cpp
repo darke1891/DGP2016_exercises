@@ -12,6 +12,7 @@
 //-----------------------------------------------------------------------------
 #include "mesh_processing.h"
 #include <set>
+#include <vector>
 
 namespace mesh_processing {
 
@@ -22,6 +23,8 @@ using std::min;
 using std::max;
 using std::cout;
 using std::endl;
+
+#define pes std::pair<Mesh::Edge, Scalar>
 
 MeshProcessing::MeshProcessing(const string& filename) {
     load_mesh(filename);
@@ -43,9 +46,9 @@ void MeshProcessing::remesh (const REMESHING_TYPE &remeshing_type,
     for (int i = 0; i < num_iterations; ++i)
     {
         split_long_edges ();
-        collapse_short_edges ();
-        equalize_valences ();
-        tangential_relaxation ();
+        //collapse_short_edges ();
+        //equalize_valences ();
+        //tangential_relaxation ();
     }
 }
 
@@ -65,6 +68,22 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type) {
 
     if (remeshing_type == AVERAGE)
     {
+        for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
+            length = 0;
+            int n = 0;
+            for (auto halfedge: mesh_.halfedges(*v_it)) {
+                auto edge = mesh_.edge(halfedge);
+                length += mesh_.edge_length(edge);
+                n += 1;
+            }
+            if (n == 0)
+                target_length[*v_it] = 1;
+            else
+                target_length[*v_it] = length / n;
+        }
+    }
+    else if (remeshing_type == CURV)
+    {
       // calculate desired length
       for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
         length = 1.0;
@@ -80,10 +99,6 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type) {
       }
 
       // rescale desired length:
-
-    }
-    else if (remeshing_type == CURV)
-    {
 
     }
     else if (remeshing_type == HEIGHT)
@@ -103,11 +118,36 @@ void MeshProcessing::split_long_edges ()
     Mesh::Vertex_property<Point> normals = mesh_.vertex_property<Point>("v:normal");
     Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
 
-  for (finished=false, i=0; !finished && i<100; ++i)
+    for (finished=false, i=0; !finished && i<100; ++i)
     {
         finished = true;
-
+        std::vector<pes> to_split;
+        to_split.clear();
+        for (auto edge: mesh_.edges()) {
+            Scalar edge_length = 0;
+            for (int i=0; i<2; i++)
+                edge_length += target_length[mesh_.vertex(edge, i)] / 2;
+            if (mesh_.edge_length(edge) > edge_length)
+                to_split.push_back(pes(edge, edge_length));
+        }
+        for (auto split_pair: to_split) {
+            auto edge = split_pair.first;
+            auto t_length = split_pair.second;
+            Point p = mesh_.position(mesh_.vertex(edge, 0));
+            p += mesh_.position(mesh_.vertex(edge, 1));
+            p /= 2;
+            auto new_vertex = mesh_.add_vertex(p);
+            target_length[new_vertex] = t_length;
+            mesh_.split(edge, new_vertex);
+            finished = false;
+        }
     }
+    mesh_.update_face_normals();
+    mesh_.update_vertex_normals();
+
+    mesh_.garbage_collection();
+
+    if (i==100) std::cerr << "split break\n";
 }
 
 void MeshProcessing::collapse_short_edges ()
