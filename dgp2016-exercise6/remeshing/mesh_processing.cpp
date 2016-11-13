@@ -43,10 +43,10 @@ void MeshProcessing::remesh (const REMESHING_TYPE &remeshing_type,
     calc_target_length (remeshing_type);
 
     // main remeshing loop
-    for (int i = 0; i < num_iterations; ++i)
+    for (int i = 0; i < 1; ++i) //num_iterations; ++i)
     {
-        split_long_edges ();
-        //collapse_short_edges ();
+        //split_long_edges ();
+        collapse_short_edges ();
         //equalize_valences ();
         //tangential_relaxation ();
     }
@@ -127,7 +127,7 @@ void MeshProcessing::split_long_edges ()
             Scalar edge_length = 0;
             for (int i=0; i<2; i++)
                 edge_length += target_length[mesh_.vertex(edge, i)] / 2;
-            if (mesh_.edge_length(edge) > edge_length)
+            if (mesh_.edge_length(edge) > edge_length * 4 / 3)
                 to_split.push_back(pes(edge, edge_length));
         }
         for (auto split_pair: to_split) {
@@ -137,7 +137,7 @@ void MeshProcessing::split_long_edges ()
             p += mesh_.position(mesh_.vertex(edge, 1));
             p /= 2;
             auto new_vertex = mesh_.add_vertex(p);
-            target_length[new_vertex] = t_length;
+            target_length[new_vertex] = t_length / 2;
             mesh_.split(edge, new_vertex);
             finished = false;
         }
@@ -165,15 +165,51 @@ void MeshProcessing::collapse_short_edges ()
     {
         finished = true;
 
-        for (e_it=mesh_.edges_begin(); e_it!=e_end; ++e_it)
-        {
-            if (!mesh_.is_deleted(*e_it)) // might already be deleted
-            {
+        std::vector<Mesh::Edge> to_delete;
+        to_delete.clear();
+        for (auto edge: mesh_.edges()) {
+            if (mesh_.is_deleted(edge))
+                continue;
+            Scalar edge_length = 0;
+            if (mesh_.is_boundary(mesh_.vertex(edge, 0)))
+                continue;
+            if (mesh_.is_boundary(mesh_.vertex(edge, 1)))
+                continue;
+            for (int i=0; i<2; i++)
+                edge_length += target_length[mesh_.vertex(edge, i)] / 2;
+            if (mesh_.edge_length(edge) < edge_length / 2) {
+                to_delete.push_back(edge);
+            }
+        }
+
+        for (auto edge: to_delete) {
+            if (!mesh_.is_deleted(edge)) {
+                if (mesh_.is_collapse_ok(mesh_.halfedge(edge, 0))) {
+                    if (mesh_.is_collapse_ok(mesh_.halfedge(edge, 1))) {
+                        int v0 = mesh_.valence(mesh_.vertex(edge, 0));
+                        int v1 = mesh_.valence(mesh_.vertex(edge, 1));
+                        if (v0 < v1)
+                            mesh_.collapse(mesh_.halfedge(edge, 1));
+                        else
+                            mesh_.collapse(mesh_.halfedge(edge, 0));
+                    }
+                    else {
+                        mesh_.collapse(mesh_.halfedge(edge, 0));
+                    }
+                }
+                else if (mesh_.is_collapse_ok(mesh_.halfedge(edge, 1)))
+                    mesh_.collapse(mesh_.halfedge(edge, 1));
+                else
+                    continue;
+                finished = false;
             }
         }
     }
 
+    
     mesh_.garbage_collection();
+    mesh_.update_face_normals();
+    mesh_.update_vertex_normals();
 
     if (i==100) std::cerr << "collapse break\n";
 }
