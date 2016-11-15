@@ -195,7 +195,7 @@ bool MeshProcessing::check_collapse_ok(Mesh::Halfedge v0v1) {
         n0 = normalize(n0);
         n1 = normalize(n1);
         auto dot01 = dot(n0, n1);
-        if (dot01 < 0)
+        if (dot01 < 0.5)
             return false;
         check += 1;
     }
@@ -246,7 +246,7 @@ void MeshProcessing::collapse_short_edges ()
 
             // Do not collapse edges that are greater or equal than the 4/5 of the target edge length.
             //
-            if (mesh_.edge_length(edge) >= (target_edge_length / 2.0f))
+            if (mesh_.edge_length(edge) >= (target_edge_length * 0.8))
             {
                 continue;
             }
