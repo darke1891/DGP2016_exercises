@@ -117,9 +117,9 @@ void MeshProcessing::split_long_edges ()
 
         for (auto edge : mesh_.edges())
         {
-            Scalar target_edge_length = (target_length[mesh_.vertex(edge, 0)] + target_length[mesh_.vertex(edge, 1)]) / 2;
+            Scalar target_edge_length = (target_length[mesh_.vertex(edge, 0)] + target_length[mesh_.vertex(edge, 1)]) / 2.0f;
 
-            if (mesh_.edge_length(edge) > (target_edge_length * 4 / 3))
+            if (mesh_.edge_length(edge) > (target_edge_length * 4.0f / 3.0f))
             {
                 // Calculate the position of the vertex that will be positioned
                 // at the point where the edge is split.
@@ -127,7 +127,7 @@ void MeshProcessing::split_long_edges ()
                 // We position the new vertex at the center of the split edge, so
                 // calculate the center of the edge to get the vertex position.
                 //
-                Point new_vertex_position = (mesh_.position(mesh_.vertex(edge, 0)) + mesh_.position(mesh_.vertex(edge, 1))) / 2;
+                Point new_vertex_position = (mesh_.position(mesh_.vertex(edge, 0)) + mesh_.position(mesh_.vertex(edge, 1))) / 2.0f;
 
                 // Add the new vertex to the mesh at the calculated position.
                 //
@@ -135,7 +135,7 @@ void MeshProcessing::split_long_edges ()
 
                 // Configure the properties of the new vertex.
                 //
-                target_length[new_vertex] = target_edge_length / 2;
+                target_length[new_vertex] = target_edge_length / 2.0f;
                 normals[new_vertex] = mesh_.compute_vertex_normal(new_vertex);
 
                 // Finally, split the edge at the new vertex.
@@ -191,11 +191,11 @@ void MeshProcessing::collapse_short_edges ()
 
             // Get the target edge length as the average of the corresponding vertices.
             //
-            Scalar target_edge_length = (target_length[from_vertex] + target_length[to_vertex]) / 2;
+            Scalar target_edge_length = (target_length[from_vertex] + target_length[to_vertex]) / 2.0f;
 
             // Do not collapse edges that are greater or equal than the 4/5 of the target edge length.
             //
-            if (mesh_.edge_length(edge) >= (target_edge_length * 4 / 5))
+            if (mesh_.edge_length(edge) >= (target_edge_length / 2.0f))
             {
                 continue;
             }
