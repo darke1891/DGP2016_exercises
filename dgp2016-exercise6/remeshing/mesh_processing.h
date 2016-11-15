@@ -62,6 +62,7 @@ private:
     void calc_vertices_weights();
     
 private:
+    bool check_collapse_ok(Mesh::Halfedge v0v1);
     unsigned int get_ideal_valence(Mesh::Vertex vertex) const;
     unsigned int calc_valence_deviation_squared(Mesh::Vertex vertex, bool flipped = false, int correction = 1) const;
 

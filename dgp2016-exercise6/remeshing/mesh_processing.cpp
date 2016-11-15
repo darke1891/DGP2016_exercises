@@ -42,9 +42,9 @@ void MeshProcessing::remesh (const REMESHING_TYPE &remeshing_type,
     // main remeshing loop
     for (int i = 0; i < 1; ++i) //num_iterations; ++i)
     {
-        //split_long_edges ();
-        //collapse_short_edges ();
-        equalize_valences ();
+        split_long_edges ();
+        collapse_short_edges ();
+        //equalize_valences ();
         //tangential_relaxation ();
     }
 }
@@ -135,7 +135,7 @@ void MeshProcessing::split_long_edges ()
 
                 // Configure the properties of the new vertex.
                 //
-                target_length[new_vertex] = target_edge_length / 2.0f;
+                target_length[new_vertex] = target_edge_length;
                 normals[new_vertex] = mesh_.compute_vertex_normal(new_vertex);
 
                 // Finally, split the edge at the new vertex.
@@ -150,7 +150,58 @@ void MeshProcessing::split_long_edges ()
         }
     }
 
+    mesh_.garbage_collection();
+    mesh_.update_face_normals();
+    mesh_.update_vertex_normals();
+
     if (i == 100) std::cerr << "split break\n";
+}
+
+bool MeshProcessing::check_collapse_ok(Mesh::Halfedge v0v1) {
+    if (!mesh_.is_collapse_ok(v0v1))
+        return false;
+    Mesh::Vertex    v0(mesh_.from_vertex(v0v1));
+    Mesh::Vertex    v1(mesh_.to_vertex(v0v1));
+    Mesh::Vertex    vv, vv2, v_first;
+    Mesh::Vertex_around_vertex_circulator vv_it, vv_end;
+    vv_it = vv_end = mesh_.vertices(v0);
+    v_first = *vv_it;
+    int check = 0;
+    do
+    {
+        vv = *vv_it;
+        ++vv_it;
+        if (vv_it != vv_end)
+            vv2 = *vv_it;
+        else
+            vv2 = v_first;
+        if ((vv == v1) || (vv2 == v1))
+            continue;
+        Scalar small = 0.15;
+        auto h0 = mesh_.position(v0) - mesh_.position(vv);
+        auto h1 = mesh_.position(v0) - mesh_.position(vv2);
+        h0 = normalize(h0);
+        h1 = normalize(h1);
+        auto n0 = cross(h0, h1);
+        if (norm(n0) < small)
+            return false;
+        h0 = mesh_.position(v1) - mesh_.position(vv);
+        h1 = mesh_.position(v1) - mesh_.position(vv2);
+        h0 = normalize(h0);
+        h1 = normalize(h1);
+        auto n1 = cross(h0, h1);
+        if (norm(n1) < small)
+            return false;
+        n0 = normalize(n0);
+        n1 = normalize(n1);
+        auto dot01 = dot(n0, n1);
+        if (dot01 < 0)
+            return false;
+        check += 1;
+    }
+    while (vv_it != vv_end);
+
+    return true;
 }
 
 void MeshProcessing::collapse_short_edges ()
@@ -202,20 +253,21 @@ void MeshProcessing::collapse_short_edges ()
 
             auto opposite_halfedge = mesh_.opposite_halfedge(halfedge);
 
+
             // Start collapsing.
             //
-            if (mesh_.is_collapse_ok(halfedge) && mesh_.is_collapse_ok(opposite_halfedge))
+            if (check_collapse_ok(halfedge) && check_collapse_ok(opposite_halfedge))
             {
                 // If both halfedges are collapsible, then collapse the lower valence vertex into the higher one.
                 //
                 auto collapsed_halfedge = mesh_.valence(from_vertex) < mesh_.valence(to_vertex) ? halfedge : opposite_halfedge;
                 mesh_.collapse(collapsed_halfedge);
             }
-            else if (mesh_.is_collapse_ok(halfedge))
+            else if (check_collapse_ok(halfedge))
             {
                 mesh_.collapse(halfedge);
             }
-            else if (mesh_.is_collapse_ok(opposite_halfedge))
+            else if (check_collapse_ok(opposite_halfedge))
             {
                 mesh_.collapse(opposite_halfedge);
             }
@@ -233,6 +285,8 @@ void MeshProcessing::collapse_short_edges ()
         }
     }
     mesh_.garbage_collection();
+    mesh_.update_face_normals();
+    mesh_.update_vertex_normals();
 
     if (i == 100) std::cerr << "collapse break\n";
 }
