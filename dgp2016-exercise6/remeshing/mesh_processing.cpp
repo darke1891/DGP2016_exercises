@@ -236,6 +236,21 @@ void MeshProcessing::collapse_short_edges ()
 
     if (i == 100) std::cerr << "collapse break\n";
 }
+    
+unsigned int MeshProcessing::get_ideal_valence(Mesh::Vertex vertex) const
+{
+    return mesh_.is_boundary(vertex) ? 4 : 6;
+}
+
+unsigned int MeshProcessing::calc_valence_deviation_squared(Mesh::Vertex vertex, bool flipped, int correction) const
+{
+    int const real_valence = !flipped ? mesh_.valence(vertex) : static_cast<int>(mesh_.valence(vertex)) + correction;
+    int const ideal_valence = get_ideal_valence(vertex);
+
+    int const valence_deviation = real_valence - ideal_valence;
+
+    return valence_deviation * valence_deviation;
+}
 
 void MeshProcessing::equalize_valences ()
 {
