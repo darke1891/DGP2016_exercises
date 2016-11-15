@@ -42,9 +42,9 @@ void MeshProcessing::remesh (const REMESHING_TYPE &remeshing_type,
     // main remeshing loop
     for (int i = 0; i < 1; ++i) //num_iterations; ++i)
     {
-        split_long_edges ();
-        collapse_short_edges ();
-        //equalize_valences ();
+        //split_long_edges ();
+        //collapse_short_edges ();
+        equalize_valences ();
         //tangential_relaxation ();
     }
 }
@@ -254,30 +254,68 @@ unsigned int MeshProcessing::calc_valence_deviation_squared(Mesh::Vertex vertex,
 
 void MeshProcessing::equalize_valences ()
 {
-    Mesh::Edge_iterator     e_it, e_end(mesh_.edges_end());
-    Mesh::Vertex   v0, v1, v2, v3;
-    Mesh::Halfedge   h;
-    int             val0, val1, val2, val3;
-    int             val_opt0, val_opt1, val_opt2, val_opt3;
-    int             ve0, ve1, ve2, ve3, ve_before, ve_after;
     bool            finished;
     int             i;
 
-
-    // flip all edges
-    for (finished=false, i=0; !finished && i<100; ++i)
+    for (finished = false, i = 0; !finished && i < 100; ++i)
     {
+        // We assume that there is no more flipping left to do.
+        //
         finished = true;
 
-        for (e_it=mesh_.edges_begin(); e_it!=e_end; ++e_it)
+        for (auto halfedge : mesh_.halfedges())
         {
-            if (!mesh_.is_boundary(*e_it))
+            auto edge = mesh_.edge(halfedge);
+
+            // Do not flip an edge if it is not suitable for it.
+            //
+            if (!mesh_.is_flip_ok(edge))
             {
+                continue;
             }
+
+            // Consider "Connectivity query" slide from SurfaceMeshTutorial.pdf
+            // In this case down_vertex is v0 from the slide, up_vertex is v1 and so on.
+            //
+            auto down_vertex = mesh_.from_vertex(halfedge);
+            auto up_vertex = mesh_.to_vertex(halfedge);
+            auto left_vertex = mesh_.to_vertex(mesh_.next_halfedge(halfedge));
+            auto right_vertex = mesh_.to_vertex((mesh_.next_halfedge(mesh_.opposite_halfedge(halfedge))));
+
+            // Compute the initial local valence deviation.
+            //
+            auto const initial_local_valence_deviation
+                    = calc_valence_deviation_squared(down_vertex)
+                    + calc_valence_deviation_squared(up_vertex)
+                    + calc_valence_deviation_squared(left_vertex)
+                    + calc_valence_deviation_squared(right_vertex);
+
+            // Compute the local valence after the potential flip.
+            // Here, we sort of simulate the flip by accrodingly adjusting the valences.
+            //
+            auto const flipped_local_valence_deviation
+                    = calc_valence_deviation_squared(down_vertex, true, -1)
+                    + calc_valence_deviation_squared(up_vertex, true, -1)
+                    + calc_valence_deviation_squared(left_vertex, true, +1)
+                    + calc_valence_deviation_squared(right_vertex, true, +1);
+
+            // Do not flip the edges if it will not bring any improvement in the local valence.
+            //
+            if (flipped_local_valence_deviation >= initial_local_valence_deviation)
+            {
+                continue;
+            }
+
+            mesh_.flip(edge);
+
+            // Since we have just flipped an edge, we start presuming that there may
+            // be more edges to flip.
+            //
+            finished = false;
         }
     }
 
-    if (i==100) std::cerr << "flip break\n";
+    if (i == 100) std::cerr << "flip break\n";
 }
 
 void MeshProcessing::tangential_relaxation ()
