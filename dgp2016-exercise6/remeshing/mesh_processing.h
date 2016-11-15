@@ -60,6 +60,10 @@ private:
     void calc_weights();
     void calc_edges_weights();
     void calc_vertices_weights();
+    
+private:
+    unsigned int get_ideal_valence(Mesh::Vertex vertex) const;
+    unsigned int calc_valence_deviation_squared(Mesh::Vertex vertex, bool flipped = false, int correction = 1) const;
 
 private:
     Mesh mesh_;

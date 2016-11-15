@@ -12,7 +12,6 @@
 //-----------------------------------------------------------------------------
 #include "mesh_processing.h"
 #include <set>
-#include <vector>
 
 namespace mesh_processing {
 
@@ -23,8 +22,6 @@ using std::min;
 using std::max;
 using std::cout;
 using std::endl;
-
-#define pes std::pair<Mesh::Edge, Scalar>
 
 MeshProcessing::MeshProcessing(const string& filename) {
     load_mesh(filename);
@@ -46,13 +43,14 @@ void MeshProcessing::remesh (const REMESHING_TYPE &remeshing_type,
     for (int i = 0; i < 1; ++i) //num_iterations; ++i)
     {
         //split_long_edges ();
-        collapse_short_edges ();
-        //equalize_valences ();
+        //collapse_short_edges ();
+        equalize_valences ();
         //tangential_relaxation ();
     }
 }
 
-void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type) {
+void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
+{
     Mesh::Vertex_iterator        v_it, v_end(mesh_.vertices_end());
     Mesh::Vertex_around_vertex_circulator  vv_c, vv_end;
     Scalar                   length;
@@ -68,37 +66,27 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type) {
 
     if (remeshing_type == AVERAGE)
     {
-        for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
+        for (auto vertex : mesh_.vertices())
+        {
             length = 0;
-            int n = 0;
-            for (auto halfedge: mesh_.halfedges(*v_it)) {
+            auto const vertex_valence = mesh_.valence(vertex);
+
+            if (vertex_valence == 0)
+            {
+                target_length[vertex] = 1;
+                continue;
+            }
+
+            for (auto halfedge : mesh_.halfedges(vertex))
+            {
                 auto edge = mesh_.edge(halfedge);
                 length += mesh_.edge_length(edge);
-                n += 1;
             }
-            if (n == 0)
-                target_length[*v_it] = 1;
-            else
-                target_length[*v_it] = length / n;
+            target_length[vertex] = length / vertex_valence;
         }
     }
     else if (remeshing_type == CURV)
     {
-      // calculate desired length
-      for (v_it = mesh_.vertices_begin(); v_it != v_end; ++v_it) {
-        length = 1.0;
-        if (!mesh_.is_boundary(*v_it)) {
-          //
-        }
-        target_length[*v_it] = length;
-      }
-
-      // smooth desired length
-      for (int i = 0; i < 5; i++) {
-        //
-      }
-
-      // rescale desired length:
 
     }
     else if (remeshing_type == HEIGHT)
@@ -110,136 +98,224 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type) {
 
 void MeshProcessing::split_long_edges ()
 {
-    Mesh::Edge_iterator     e_it, e_end(mesh_.edges_end());
-    Mesh::Vertex   v0, v1, v;
-    bool            finished;
-    int             i;
-
     Mesh::Vertex_property<Point> normals = mesh_.vertex_property<Point>("v:normal");
     Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
 
-    for (finished=false, i=0; !finished && i<100; ++i)
+    bool finished;
+    int i;
+
+    for (finished = false, i = 0; !finished && i < 100; ++i)
     {
-        finished = true;
-        std::vector<pes> to_split;
-        to_split.clear();
-        for (auto edge: mesh_.edges()) {
-            Scalar edge_length = 0;
-            for (int i=0; i<2; i++)
-                edge_length += target_length[mesh_.vertex(edge, i)] / 2;
-            if (mesh_.edge_length(edge) > edge_length * 4 / 3)
-                to_split.push_back(pes(edge, edge_length));
-        }
-        for (auto split_pair: to_split) {
-            auto edge = split_pair.first;
-            auto t_length = split_pair.second;
-            Point p = mesh_.position(mesh_.vertex(edge, 0));
-            p += mesh_.position(mesh_.vertex(edge, 1));
-            p /= 2;
-            auto new_vertex = mesh_.add_vertex(p);
-            target_length[new_vertex] = t_length / 2;
-            mesh_.split(edge, new_vertex);
-            finished = false;
-        }
-    }
-    mesh_.update_face_normals();
-    mesh_.update_vertex_normals();
-
-    mesh_.garbage_collection();
-
-    if (i==100) std::cerr << "split break\n";
-}
-
-void MeshProcessing::collapse_short_edges ()
-{
-    Mesh::Edge_iterator     e_it, e_end(mesh_.edges_end());
-    Mesh::Vertex   v0, v1;
-    Mesh::Halfedge  h01, h10;
-    bool            finished, b0, b1;
-    int             i;
-    bool            hcol01, hcol10;
-
-    Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
-
-    for (finished=false, i=0; !finished && i<100; ++i)
-    {
+        // We presume that there is no more splitting left to do.
+        //
         finished = true;
 
-        std::vector<Mesh::Edge> to_delete;
-        to_delete.clear();
-        for (auto edge: mesh_.edges()) {
-            if (mesh_.is_deleted(edge))
-                continue;
-            Scalar edge_length = 0;
-            if (mesh_.is_boundary(mesh_.vertex(edge, 0)))
-                continue;
-            if (mesh_.is_boundary(mesh_.vertex(edge, 1)))
-                continue;
-            for (int i=0; i<2; i++)
-                edge_length += target_length[mesh_.vertex(edge, i)] / 2;
-            if (mesh_.edge_length(edge) < edge_length / 2) {
-                to_delete.push_back(edge);
-            }
-        }
 
-        for (auto edge: to_delete) {
-            if (!mesh_.is_deleted(edge)) {
-                if (mesh_.is_collapse_ok(mesh_.halfedge(edge, 0))) {
-                    if (mesh_.is_collapse_ok(mesh_.halfedge(edge, 1))) {
-                        int v0 = mesh_.valence(mesh_.vertex(edge, 0));
-                        int v1 = mesh_.valence(mesh_.vertex(edge, 1));
-                        if (v0 < v1)
-                            mesh_.collapse(mesh_.halfedge(edge, 1));
-                        else
-                            mesh_.collapse(mesh_.halfedge(edge, 0));
-                    }
-                    else {
-                        mesh_.collapse(mesh_.halfedge(edge, 0));
-                    }
-                }
-                else if (mesh_.is_collapse_ok(mesh_.halfedge(edge, 1)))
-                    mesh_.collapse(mesh_.halfedge(edge, 1));
-                else
-                    continue;
+        //
+        // Lookup and split the edges.
+        //
+
+        for (auto edge : mesh_.edges())
+        {
+            Scalar target_edge_length = (target_length[mesh_.vertex(edge, 0)] + target_length[mesh_.vertex(edge, 1)]) / 2.0f;
+
+            if (mesh_.edge_length(edge) > (target_edge_length * 4.0f / 3.0f))
+            {
+                // Calculate the position of the vertex that will be positioned
+                // at the point where the edge is split.
+                //
+                // We position the new vertex at the center of the split edge, so
+                // calculate the center of the edge to get the vertex position.
+                //
+                Point new_vertex_position = (mesh_.position(mesh_.vertex(edge, 0)) + mesh_.position(mesh_.vertex(edge, 1))) / 2.0f;
+
+                // Add the new vertex to the mesh at the calculated position.
+                //
+                auto new_vertex = mesh_.add_vertex(new_vertex_position);
+
+                // Configure the properties of the new vertex.
+                //
+                target_length[new_vertex] = target_edge_length / 2.0f;
+                normals[new_vertex] = mesh_.compute_vertex_normal(new_vertex);
+
+                // Finally, split the edge at the new vertex.
+                //
+                mesh_.split(edge, new_vertex);
+
+                // Since we have just splitted an edge, we start presuming that there may
+                // be more edges to split.
+                //
                 finished = false;
             }
         }
     }
 
-    
-    mesh_.garbage_collection();
-    mesh_.update_face_normals();
-    mesh_.update_vertex_normals();
+    if (i == 100) std::cerr << "split break\n";
+}
 
-    if (i==100) std::cerr << "collapse break\n";
+void MeshProcessing::collapse_short_edges ()
+{
+    Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
+
+    bool            finished;
+    int             i;
+
+    for (finished = false, i = 0; !finished && i < 100; ++i)
+    {
+        // We assume that there is no more splitting left to do.
+        //
+        finished = true;
+
+        // Lookup and collapse the edges.
+        //
+        for (auto halfedge : mesh_.halfedges())
+        {
+            auto edge = mesh_.edge(halfedge);
+            
+            // Do not collapse halfedges if their correspoding edges are already deleted.
+            //
+            if (mesh_.is_deleted(edge))
+            {
+                continue;
+            }
+
+            // Do not collapse edges that lie on the boundary.
+            //
+            if (mesh_.is_boundary(edge))
+            {
+                continue;
+            }
+
+            auto from_vertex = mesh_.from_vertex(halfedge);
+            auto to_vertex = mesh_.to_vertex(halfedge);
+
+            // Get the target edge length as the average of the corresponding vertices.
+            //
+            Scalar target_edge_length = (target_length[from_vertex] + target_length[to_vertex]) / 2.0f;
+
+            // Do not collapse edges that are greater or equal than the 4/5 of the target edge length.
+            //
+            if (mesh_.edge_length(edge) >= (target_edge_length / 2.0f))
+            {
+                continue;
+            }
+
+            auto opposite_halfedge = mesh_.opposite_halfedge(halfedge);
+
+            // Start collapsing.
+            //
+            if (mesh_.is_collapse_ok(halfedge) && mesh_.is_collapse_ok(opposite_halfedge))
+            {
+                // If both halfedges are collapsible, then collapse the lower valence vertex into the higher one.
+                //
+                auto collapsed_halfedge = mesh_.valence(from_vertex) < mesh_.valence(to_vertex) ? halfedge : opposite_halfedge;
+                mesh_.collapse(collapsed_halfedge);
+            }
+            else if (mesh_.is_collapse_ok(halfedge))
+            {
+                mesh_.collapse(halfedge);
+            }
+            else if (mesh_.is_collapse_ok(opposite_halfedge))
+            {
+                mesh_.collapse(opposite_halfedge);
+            }
+            else
+            {
+                // Do not collapse any of the two halfedges if neither of them is collapsible.
+                //
+                continue;
+            }
+
+            // Since we have just collapsed an edge, we start presuming that there may
+            // be more edges to collapse.
+            //
+            finished = false;
+        }
+    }
+    mesh_.garbage_collection();
+
+    if (i == 100) std::cerr << "collapse break\n";
+}
+    
+unsigned int MeshProcessing::get_ideal_valence(Mesh::Vertex vertex) const
+{
+    return mesh_.is_boundary(vertex) ? 4 : 6;
+}
+
+unsigned int MeshProcessing::calc_valence_deviation_squared(Mesh::Vertex vertex, bool flipped, int correction) const
+{
+    int const real_valence = !flipped ? mesh_.valence(vertex) : static_cast<int>(mesh_.valence(vertex)) + correction;
+    int const ideal_valence = get_ideal_valence(vertex);
+
+    int const valence_deviation = real_valence - ideal_valence;
+
+    return valence_deviation * valence_deviation;
 }
 
 void MeshProcessing::equalize_valences ()
 {
-    Mesh::Edge_iterator     e_it, e_end(mesh_.edges_end());
-    Mesh::Vertex   v0, v1, v2, v3;
-    Mesh::Halfedge   h;
-    int             val0, val1, val2, val3;
-    int             val_opt0, val_opt1, val_opt2, val_opt3;
-    int             ve0, ve1, ve2, ve3, ve_before, ve_after;
     bool            finished;
     int             i;
 
-
-    // flip all edges
-    for (finished=false, i=0; !finished && i<100; ++i)
+    for (finished = false, i = 0; !finished && i < 100; ++i)
     {
+        // We assume that there is no more flipping left to do.
+        //
         finished = true;
 
-        for (e_it=mesh_.edges_begin(); e_it!=e_end; ++e_it)
+        for (auto halfedge : mesh_.halfedges())
         {
-            if (!mesh_.is_boundary(*e_it))
+            auto edge = mesh_.edge(halfedge);
+
+            // Do not flip an edge if it is not suitable for it.
+            //
+            if (!mesh_.is_flip_ok(edge))
             {
+                continue;
             }
+
+            // Consider "Connectivity query" slide from SurfaceMeshTutorial.pdf
+            // In this case down_vertex is v0 from the slide, up_vertex is v1 and so on.
+            //
+            auto down_vertex = mesh_.from_vertex(halfedge);
+            auto up_vertex = mesh_.to_vertex(halfedge);
+            auto left_vertex = mesh_.to_vertex(mesh_.next_halfedge(halfedge));
+            auto right_vertex = mesh_.to_vertex((mesh_.next_halfedge(mesh_.opposite_halfedge(halfedge))));
+
+            // Compute the initial local valence deviation.
+            //
+            auto const initial_local_valence_deviation
+                    = calc_valence_deviation_squared(down_vertex)
+                    + calc_valence_deviation_squared(up_vertex)
+                    + calc_valence_deviation_squared(left_vertex)
+                    + calc_valence_deviation_squared(right_vertex);
+
+            // Compute the local valence after the potential flip.
+            // Here, we sort of simulate the flip by accrodingly adjusting the valences.
+            //
+            auto const flipped_local_valence_deviation
+                    = calc_valence_deviation_squared(down_vertex, true, -1)
+                    + calc_valence_deviation_squared(up_vertex, true, -1)
+                    + calc_valence_deviation_squared(left_vertex, true, +1)
+                    + calc_valence_deviation_squared(right_vertex, true, +1);
+
+            // Do not flip the edges if it will not bring any improvement in the local valence.
+            //
+            if (flipped_local_valence_deviation >= initial_local_valence_deviation)
+            {
+                continue;
+            }
+
+            mesh_.flip(edge);
+
+            // Since we have just flipped an edge, we start presuming that there may
+            // be more edges to flip.
+            //
+            finished = false;
         }
     }
 
-    if (i==100) std::cerr << "flip break\n";
+    if (i == 100) std::cerr << "flip break\n";
 }
 
 void MeshProcessing::tangential_relaxation ()
