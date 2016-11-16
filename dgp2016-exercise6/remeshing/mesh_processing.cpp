@@ -18,6 +18,9 @@ namespace mesh_processing {
 using surface_mesh::Point;
 using surface_mesh::Scalar;
 using surface_mesh::Color;
+using surface_mesh::Vec3;
+using surface_mesh::Normal;
+using surface_mesh::cross;
 using std::min;
 using std::max;
 using std::cout;
@@ -44,7 +47,7 @@ void MeshProcessing::remesh (const REMESHING_TYPE &remeshing_type,
     {
         split_long_edges ();
         collapse_short_edges ();
-        //equalize_valences ();
+        equalize_valences ();
         tangential_relaxation ();
     }
 }
@@ -374,40 +377,64 @@ void MeshProcessing::equalize_valences ()
 
 void MeshProcessing::tangential_relaxation ()
 {
-    Mesh::Vertex_iterator     v_it, v_end(mesh_.vertices_end());
-    Mesh::Vertex_around_vertex_circulator   vv_c, vv_end;
-    int    valence;
-    Point     u, n;
-    Point     laplace;
-
     Mesh::Vertex_property<Point> normals = mesh_.vertex_property<Point>("v:normal");
     Mesh::Vertex_property<Point> update = mesh_.vertex_property<Point>("v:update");
 
-
-    // smooth
-    for (int iters=0; iters<10; ++iters)
+    for (auto vertex : mesh_.vertices())
     {
-        for (v_it=mesh_.vertices_begin(); v_it!=v_end; ++v_it)
+        if (mesh_.is_boundary(vertex))
         {
-            if (!mesh_.is_boundary(*v_it))
-            {
-                auto vertex = (*v_it);
-                int n = mesh_.valence(vertex);
-                if (n == 0)
-                    continue;
-                for (auto neighbor_vertex: mesh_.vertices(vertex)){
-                    auto delta = mesh_.position(neighbor_vertex) - mesh_.position(vertex);
-                    auto normal = normals[vertex];
-                    update[vertex] += delta - normal * surface_mesh::dot(normal,delta);
-                }
-
-                update[vertex] /= n * 2;
-            }
+            continue;
         }
 
-        for (v_it=mesh_.vertices_begin(); v_it!=v_end; ++v_it)
-            if (!mesh_.is_boundary(*v_it))
-                mesh_.position(*v_it) += update[*v_it];
+        auto const vertex_valence = mesh_.valence(vertex);
+
+        if (vertex_valence == 0)
+        {
+            continue;
+        }
+
+        // Calculate the uniform Laplacian smoothing vector.
+        //
+        Vec3 lu_smoothing_direction(0.0f, 0.0f, 0.0f);
+
+        for (auto neighbor_vertex : mesh_.vertices(vertex))
+        {
+            lu_smoothing_direction += mesh_.position(neighbor_vertex) - mesh_.position(vertex);
+        }
+        lu_smoothing_direction /= vertex_valence;
+
+        // Get the unit normal vector for the given surface at the current vertex point.
+        // The normals in the corresponding vertex property should be already normalized.
+        //
+        Normal const & unit_normal = normals[vertex];
+
+        // Compute the tangential component of the uniform laplacian smoothing vector
+        // using the formula:
+        // v_t = -n x (n x lu), where n is unit normal, x is the cross product and lu is our lu vector.
+        //
+        Vec3 const tangential_component = cross(-unit_normal, cross(unit_normal, lu_smoothing_direction));
+
+        // Store the tangential component as a value in the update property of the current vertex.
+        //
+        update[vertex] = tangential_component;
+    }
+
+    // Smooth the vertices using their update properties.
+    //
+    for (auto vertex : mesh_.vertices())
+    {
+        if (mesh_.is_boundary(vertex))
+        {
+            continue;
+        }
+
+        if (mesh_.valence(vertex) == 0)
+        {
+            continue;
+        }
+
+        mesh_.position(vertex) += update[vertex];
     }
 }
 
@@ -440,22 +467,6 @@ void MeshProcessing::calc_mean_curvature() {
     // Save your approximation in v_curvature vertex property of the mesh.
     // Use the weights from calc_weights(): e_weight and v_weight
     // ------------- IMPLEMENT HERE ---------
-
-
-        for (auto vertex: mesh_.vertices()) {
-            v_curvature[vertex] = 0;
-            if (mesh_.is_boundary(vertex))
-                continue;
-            int n = mesh_.valence(vertex);
-            if (n == 0)
-                continue;
-            for (auto neighbor_vertex: mesh_.vertices(vertex))
-                v_curvature[vertex] += surface_mesh::norm(mesh_.position(neighbor_vertex) - mesh_.position(vertex));
-            v_curvature[vertex] /= n * 2;
-        }
-
-
-
 }
 
 // ========================================================================
