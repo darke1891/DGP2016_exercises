@@ -45,7 +45,7 @@ void MeshProcessing::remesh (const REMESHING_TYPE &remeshing_type,
         split_long_edges ();
         collapse_short_edges ();
         //equalize_valences ();
-        //tangential_relaxation ();
+        tangential_relaxation ();
     }
 }
 
@@ -391,6 +391,17 @@ void MeshProcessing::tangential_relaxation ()
         {
             if (!mesh_.is_boundary(*v_it))
             {
+                auto vertex = (*v_it);
+                int n = mesh_.valence(vertex);
+                if (n == 0)
+                    continue;
+                for (auto neighbor_vertex: mesh_.vertices(vertex)){
+                    auto delta = mesh_.position(neighbor_vertex) - mesh_.position(vertex);
+                    auto normal = normals[vertex];
+                    update[vertex] += delta - normal * surface_mesh::dot(normal,delta);
+                }
+
+                update[vertex] /= n * 2;
             }
         }
 
@@ -429,6 +440,22 @@ void MeshProcessing::calc_mean_curvature() {
     // Save your approximation in v_curvature vertex property of the mesh.
     // Use the weights from calc_weights(): e_weight and v_weight
     // ------------- IMPLEMENT HERE ---------
+
+
+        for (auto vertex: mesh_.vertices()) {
+            v_curvature[vertex] = 0;
+            if (mesh_.is_boundary(vertex))
+                continue;
+            int n = mesh_.valence(vertex);
+            if (n == 0)
+                continue;
+            for (auto neighbor_vertex: mesh_.vertices(vertex))
+                v_curvature[vertex] += surface_mesh::norm(mesh_.position(neighbor_vertex) - mesh_.position(vertex));
+            v_curvature[vertex] /= n * 2;
+        }
+
+
+
 }
 
 // ========================================================================
