@@ -12,6 +12,7 @@
 //-----------------------------------------------------------------------------
 #include "mesh_processing.h"
 #include <set>
+#include <vector>
 
 namespace mesh_processing {
 
@@ -97,20 +98,24 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
         calc_mean_curvature();
         calc_gauss_curvature();
         calc_uniform_mean_curvature();
+        std::vector<Scalar> new_curvature(mesh_.vertices_size());
 
         //Smooth curvature
         for(int i = 0; i < curvatureSmoothing;i++){
             for(auto vertex : mesh_.vertices()) {
+                new_curvature[vertex.idx()] = 0;
                 auto valence = mesh_.valence(vertex);
 
                 for(auto neighboor : mesh_.vertices(vertex)){
-                    curvature[vertex] += curvature[neighboor];
+                    new_curvature[vertex.idx()] += curvature[neighboor];
                 }
                 // Average between the curvature of the vertex and all its neighbors. So there are valence + 1 points.
 
-                curvature[vertex]/=valence+1.0;
+                new_curvature[vertex.idx()]/=valence+1.0;
 
             }
+            for (auto vertex: mesh_.vertices())
+                curvature[vertex] = new_curvature[vertex.idx()];
         }
         auto average_smoothed_curv = 0.0;
         for(auto vertex : mesh_.vertices()) {
