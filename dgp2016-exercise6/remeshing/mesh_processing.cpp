@@ -130,8 +130,13 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
 
         for (auto vertex : mesh_.vertices())
         {
+            //The user have no way to chose a mean length so I use this.
             auto c = average_smoothed_curv/curvature[vertex];
             target_length[vertex] *=  c;
+            //If he would, I would use this :
+            /*
+             * target_length[vertex]  = target_mean * average_smoothed_curv/curvature[vertex];
+             */
         }
     }
     else if (remeshing_type == HEIGHT)
