@@ -366,7 +366,7 @@ Viewer::Viewer() : nanogui::Screen(Eigen::Vector2i(1024, 768), "DGP Viewer") {
 
     b = new Button(window_, "Remeshing");
     b->setCallback([this]() {
-        this->mesh_->remesh(this->remeshing_type, 1);
+        this->mesh_->remesh(this->remeshing_type, 5);
         this->mesh_->compute_mesh_properties();
         this->refresh_mesh();
     });

@@ -63,7 +63,7 @@ private:
     
 private:
     surface_mesh::Scalar small_triangle = 0.15;
-    surface_mesh::Scalar small_flip = 0.5;
+    surface_mesh::Scalar small_flip = 0.3;
     bool check_collapse_ok(Mesh::Halfedge v0v1);
     unsigned int get_ideal_valence(Mesh::Vertex vertex) const;
     unsigned int calc_valence_deviation_squared(Mesh::Vertex vertex, bool flipped = false, int correction = 1) const;

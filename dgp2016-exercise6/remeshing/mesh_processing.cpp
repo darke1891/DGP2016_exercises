@@ -44,7 +44,7 @@ void MeshProcessing::remesh (const REMESHING_TYPE &remeshing_type,
     calc_target_length (remeshing_type);
 
     // main remeshing loop
-    for (int i = 0; i < 1; ++i) //num_iterations; ++i)
+    for (int i = 0; i < num_iterations; ++i)
     {
         split_long_edges ();
         collapse_short_edges ();
@@ -72,23 +72,41 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
 
     if (remeshing_type == AVERAGE)
     {
-        for (auto vertex : mesh_.vertices())
-        {
+        bool global_average = true;
+        if (global_average) {
             length = 0;
-            auto const vertex_valence = mesh_.valence(vertex);
-
-            if (vertex_valence == 0)
-            {
-                target_length[vertex] = 1;
-                continue;
-            }
-
-            for (auto halfedge : mesh_.halfedges(vertex))
-            {
-                auto edge = mesh_.edge(halfedge);
+            int n = 0;
+            for (auto edge: mesh_.edges()) {
                 length += mesh_.edge_length(edge);
+                n++;
             }
-            target_length[vertex] = length / vertex_valence;
+            if (n == 0)
+                length = 1;
+            else
+                length /= n;
+            for (auto vertex: mesh_.vertices()) {
+                target_length[vertex] = length;
+            }
+        }
+        else {
+            for (auto vertex : mesh_.vertices())
+            {
+                length = 0;
+                auto const vertex_valence = mesh_.valence(vertex);
+                
+                if (vertex_valence == 0)
+                {
+                    target_length[vertex] = 1;
+                    continue;
+                }
+                
+                for (auto halfedge : mesh_.halfedges(vertex))
+                {
+                    auto edge = mesh_.edge(halfedge);
+                    length += mesh_.edge_length(edge);
+                }
+                target_length[vertex] = length / vertex_valence;
+            }
         }
     }
     else if (remeshing_type == CURV)
@@ -202,10 +220,10 @@ bool MeshProcessing::check_collapse_ok(Mesh::Halfedge v0v1) {
         if ((vv == v1) || (vv2 == v1))
             continue;
         auto n0 = calc_triangle_norm(mesh_.position(v0), mesh_.position(vv), mesh_.position(vv2));
-        if (norm(n0) < small_triangle)
-            return false;
+        //if (norm(n0) < small_triangle)
+        //    return false;
         auto n1 = calc_triangle_norm(mesh_.position(v1), mesh_.position(vv), mesh_.position(vv2));
-        if (norm(n1) < small_triangle)
+        if ((norm(n1) < norm(n0)) && (norm(n1) < small_triangle))
             return false;
         n0 = normalize(n0);
         n1 = normalize(n1);
@@ -253,6 +271,11 @@ void MeshProcessing::collapse_short_edges ()
 
             auto from_vertex = mesh_.from_vertex(halfedge);
             auto to_vertex = mesh_.to_vertex(halfedge);
+
+            if (mesh_.is_boundary(from_vertex))
+                continue;
+            if (mesh_.is_boundary(to_vertex))
+                continue;
 
             // Get the target edge length as the average of the corresponding vertices.
             //
@@ -317,7 +340,7 @@ unsigned int MeshProcessing::calc_valence_deviation_squared(Mesh::Vertex vertex,
 
     int const valence_deviation = real_valence - ideal_valence;
 
-    return valence_deviation * valence_deviation;
+    return abs(valence_deviation);
 }
 
 Vec3 MeshProcessing::calc_triangle_norm(Point a0, Point a1, Point a2) {
@@ -459,7 +482,7 @@ bool MeshProcessing::check_relaxation_ok(Mesh::Vertex vertex, Vec3 updated) {
             vv2 = v_first;
         auto n0 = calc_triangle_norm(v0, mesh_.position(vv), mesh_.position(vv2));
         auto n1 = calc_triangle_norm(v1, mesh_.position(vv), mesh_.position(vv2));
-        if (norm(n1) < small_triangle)
+        if ((norm(n1) < norm(n0)) && (norm(n1) < small_triangle))
             return false;
         n0 = normalize(n0);
         n1 = normalize(n1);
