@@ -82,6 +82,7 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
             length = 1;
         else
             length /= n;
+        length *= 0.8;
         for (auto vertex: mesh_.vertices()) {
             target_length[vertex] = length;
         }
@@ -322,10 +323,10 @@ void MeshProcessing::collapse_short_edges ()
             //
             finished = false;
         }
+        mesh_.garbage_collection();
+        mesh_.update_face_normals();
+        mesh_.update_vertex_normals();
     }
-    mesh_.garbage_collection();
-    mesh_.update_face_normals();
-    mesh_.update_vertex_normals();
 
     if (i == 100) std::cerr << "collapse break\n";
 }
