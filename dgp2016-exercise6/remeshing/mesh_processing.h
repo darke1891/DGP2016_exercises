@@ -62,9 +62,14 @@ private:
     void calc_vertices_weights();
     
 private:
+    surface_mesh::Scalar small_triangle = 0.15;
+    surface_mesh::Scalar small_flip = 0.5;
     bool check_collapse_ok(Mesh::Halfedge v0v1);
     unsigned int get_ideal_valence(Mesh::Vertex vertex) const;
     unsigned int calc_valence_deviation_squared(Mesh::Vertex vertex, bool flipped = false, int correction = 1) const;
+    bool check_flip_edge_ok(Mesh::Vertex up, Mesh::Vertex down, Mesh::Vertex left, Mesh::Vertex right);
+    surface_mesh::Vec3 calc_triangle_norm(surface_mesh::Point a0, surface_mesh::Point a1, surface_mesh::Point a2);
+    bool check_relaxation_ok(Mesh::Vertex vertex, surface_mesh::Vec3 updated);
 
 private:
     Mesh mesh_;

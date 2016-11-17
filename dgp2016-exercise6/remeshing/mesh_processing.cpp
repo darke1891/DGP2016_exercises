@@ -169,7 +169,6 @@ bool MeshProcessing::check_collapse_ok(Mesh::Halfedge v0v1) {
     Mesh::Vertex_around_vertex_circulator vv_it, vv_end;
     vv_it = vv_end = mesh_.vertices(v0);
     v_first = *vv_it;
-    int check = 0;
     do
     {
         vv = *vv_it;
@@ -180,27 +179,17 @@ bool MeshProcessing::check_collapse_ok(Mesh::Halfedge v0v1) {
             vv2 = v_first;
         if ((vv == v1) || (vv2 == v1))
             continue;
-        Scalar small = 0.15;
-        auto h0 = mesh_.position(v0) - mesh_.position(vv);
-        auto h1 = mesh_.position(v0) - mesh_.position(vv2);
-        h0 = normalize(h0);
-        h1 = normalize(h1);
-        auto n0 = cross(h0, h1);
-        if (norm(n0) < small)
+        auto n0 = calc_triangle_norm(mesh_.position(v0), mesh_.position(vv), mesh_.position(vv2));
+        if (norm(n0) < small_triangle)
             return false;
-        h0 = mesh_.position(v1) - mesh_.position(vv);
-        h1 = mesh_.position(v1) - mesh_.position(vv2);
-        h0 = normalize(h0);
-        h1 = normalize(h1);
-        auto n1 = cross(h0, h1);
-        if (norm(n1) < small)
+        auto n1 = calc_triangle_norm(mesh_.position(v1), mesh_.position(vv), mesh_.position(vv2));
+        if (norm(n1) < small_triangle)
             return false;
         n0 = normalize(n0);
         n1 = normalize(n1);
         auto dot01 = dot(n0, n1);
-        if (dot01 < 0.5)
+        if (dot01 < small_flip)
             return false;
-        check += 1;
     }
     while (vv_it != vv_end);
 
@@ -309,6 +298,54 @@ unsigned int MeshProcessing::calc_valence_deviation_squared(Mesh::Vertex vertex,
     return valence_deviation * valence_deviation;
 }
 
+Vec3 MeshProcessing::calc_triangle_norm(Point a0, Point a1, Point a2) {
+    auto edge01 = a1 - a0;
+    auto edge02 = a2 - a0;
+    auto edge12 = a2 - a1;
+    edge01 = normalize(edge01);
+    edge02 = normalize(edge02);
+    edge12 = normalize(edge12);
+    auto normal0 = cross(edge01, edge02);
+    auto normal1 = cross(edge12, -edge01);
+    auto normal2 = cross(-edge02, -edge12);
+    if (norm(normal0) < norm(normal1)) {
+        if (norm(normal0) < norm(normal2))
+            return normal0;
+        else
+            return normal2;
+    }
+    else if (norm(normal1) < norm(normal2))
+        return normal1;
+    else
+        return normal2;
+}
+
+bool MeshProcessing::check_flip_edge_ok(Mesh::Vertex up, Mesh::Vertex down, Mesh::Vertex left, Mesh::Vertex right) {
+    auto norm_old0 = calc_triangle_norm(mesh_.position(up), mesh_.position(left), mesh_.position(down));
+    auto norm_old1 = calc_triangle_norm(mesh_.position(up), mesh_.position(down), mesh_.position(right));
+    auto norm_new0 = calc_triangle_norm(mesh_.position(up), mesh_.position(left), mesh_.position(right));
+    auto norm_new1 = calc_triangle_norm(mesh_.position(down), mesh_.position(right), mesh_.position(left));
+    if (norm(norm_new0) < small_triangle)
+        return false;
+    if (norm(norm_new1) < small_triangle)
+        return false;
+    norm_old0 = normalize(norm_old0);
+    norm_old1 = normalize(norm_old1);
+    norm_new0 = normalize(norm_new0);
+    norm_new1 = normalize(norm_new1);
+    if (dot(norm_new0, norm_new1) < 0)
+        return false;
+    if (dot(norm_old0, norm_new0) < small_flip)
+        return false;
+    if (dot(norm_old0, norm_new1) < small_flip)
+        return false;
+    if (dot(norm_old1, norm_new0) < small_flip)
+        return false;
+    if (dot(norm_old1, norm_new1) < small_flip)
+        return false;
+    return true;
+}
+
 void MeshProcessing::equalize_valences ()
 {
     bool            finished;
@@ -363,6 +400,11 @@ void MeshProcessing::equalize_valences ()
                 continue;
             }
 
+            // make sure that fliping edge doesn't flip faces
+            if (!check_flip_edge_ok(up_vertex, down_vertex, left_vertex, right_vertex)) {
+                continue;
+            }
+
             mesh_.flip(edge);
 
             // Since we have just flipped an edge, we start presuming that there may
@@ -371,8 +413,40 @@ void MeshProcessing::equalize_valences ()
             finished = false;
         }
     }
+    mesh_.garbage_collection();
+    mesh_.update_face_normals();
+    mesh_.update_vertex_normals();
 
     if (i == 100) std::cerr << "flip break\n";
+}
+
+bool MeshProcessing::check_relaxation_ok(Mesh::Vertex vertex, Vec3 updated) {
+    auto v0 = mesh_.position(vertex);
+    auto v1 = v0 + updated;
+    Mesh::Vertex    vv, vv2, v_first;
+    Mesh::Vertex_around_vertex_circulator vv_it, vv_end;
+    vv_it = vv_end = mesh_.vertices(vertex);
+    v_first = *vv_it;
+    do
+    {
+        vv = *vv_it;
+        ++vv_it;
+        if (vv_it != vv_end)
+            vv2 = *vv_it;
+        else
+            vv2 = v_first;
+        auto n0 = calc_triangle_norm(v0, mesh_.position(vv), mesh_.position(vv2));
+        auto n1 = calc_triangle_norm(v1, mesh_.position(vv), mesh_.position(vv2));
+        if (norm(n1) < small_triangle)
+            return false;
+        n0 = normalize(n0);
+        n1 = normalize(n1);
+        auto dot01 = dot(n0, n1);
+        if (dot01 < small_flip)
+            return false;
+    }
+    while (vv_it != vv_end);
+    return true;
 }
 
 void MeshProcessing::tangential_relaxation ()
@@ -382,6 +456,7 @@ void MeshProcessing::tangential_relaxation ()
 
     for (auto vertex : mesh_.vertices())
     {
+        update[vertex] = Vec3(0,0,0);
         if (mesh_.is_boundary(vertex))
         {
             continue;
@@ -422,6 +497,7 @@ void MeshProcessing::tangential_relaxation ()
 
     // Smooth the vertices using their update properties.
     //
+    int num_update = 0;
     for (auto vertex : mesh_.vertices())
     {
         if (mesh_.is_boundary(vertex))
@@ -434,8 +510,17 @@ void MeshProcessing::tangential_relaxation ()
             continue;
         }
 
+        if (!check_relaxation_ok(vertex, update[vertex])) {
+            continue;
+        }
+
         mesh_.position(vertex) += update[vertex];
+        num_update++;
     }
+    cout << "update " << num_update << " vertices" << endl;
+    mesh_.garbage_collection();
+    mesh_.update_face_normals();
+    mesh_.update_vertex_normals();
 }
 
 // ========================================================================
