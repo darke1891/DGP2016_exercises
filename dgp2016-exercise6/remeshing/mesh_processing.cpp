@@ -62,6 +62,8 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
     Scalar                   H;
     Scalar                   K;
 
+    int curvatureSmoothing = 1; //Number of time the curvature is smoothed before being used for remeshing.
+
     Mesh::Vertex_property<Scalar> curvature = mesh_.vertex_property<Scalar>("v:meancurvature", 0);
     Mesh::Vertex_property<Scalar> gauss_curvature = mesh_.vertex_property<Scalar>("v:gausscurvature", 0);
     Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
@@ -91,6 +93,25 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
     }
     else if (remeshing_type == CURV)
     {
+
+        //Only one of these is useful
+        calc_uniform_mean_curvature();
+        calc_mean_curvature();
+        calc_gauss_curvature();
+
+        //Smooth curvature
+        for(int i = 0; i < curvatureSmoothing;i++){
+            for(auto vertex : mesh_.vertices()) {
+                auto valence = mesh_.valence(vertex);
+                for(auto neighboor : mesh_.vertices(vertex)){
+                    curvature[vertex] += curvature[neighboor];
+                }
+                // Average between the curvature of the vertex and all its neighbors. So there are valence + 1 points.
+                curvature[vertex]/=valence+1;
+            }
+        }
+
+        //TODO actual remeshing
 
     }
     else if (remeshing_type == HEIGHT)
@@ -529,7 +550,7 @@ void MeshProcessing::calc_gauss_curvature() {
                 else if (mesh_.from_vertex(face_edge) == vertex)
                     l[1] = mesh_.edge_length(mesh_.edge(face_edge));
                 else
-                    l[2] = mesh.edge_length(mesh.edge(face_edge));
+                    l[2] = mesh_.edge_length(mesh_.edge(face_edge));
             }
             std::complex<double> z((l[0] * l[0] + l[1] * l[1] - l[2] * l[2]) / 2 / l[0] / l[1], 0);
             sum -= acos(z).real();
