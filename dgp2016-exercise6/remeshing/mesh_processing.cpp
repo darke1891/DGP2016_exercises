@@ -64,7 +64,7 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
 
     int curvatureSmoothing = 1; //Number of time the curvature is smoothed before being used for remeshing.
 
-    Mesh::Vertex_property<Scalar> curvature = mesh_.vertex_property<Scalar>("v:meancurvature", 0);
+    Mesh::Vertex_property<Scalar> curvature = mesh_.vertex_property<Scalar>("v:curvature", 0);
     Mesh::Vertex_property<Scalar> gauss_curvature = mesh_.vertex_property<Scalar>("v:gausscurvature", 0);
     Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
     Mesh::Vertex_property<Scalar> target_new_length  = mesh_.vertex_property<Scalar>("v:newlength", 0);
@@ -90,25 +90,54 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
     else if (remeshing_type == CURV)
     {
 
-        //Only one of these is useful
-        calc_uniform_mean_curvature();
-        calc_mean_curvature();
-        calc_gauss_curvature();
+        length = 0;
+        int n = 0;
+        for (auto edge: mesh_.edges()) {
+            length += mesh_.edge_length(edge);
+            n++;
+        }
+        if (n == 0)
+            length = 1;
+        else
+            length /= n;
+        length *= 0.8;
+        for (auto vertex: mesh_.vertices()) {
+            target_length[vertex] = length;
+        }
 
+        //Only one of these is useful
+        calc_mean_curvature();
+        cout <<"a"<<endl;
         //Smooth curvature
         for(int i = 0; i < curvatureSmoothing;i++){
             for(auto vertex : mesh_.vertices()) {
                 auto valence = mesh_.valence(vertex);
+
                 for(auto neighboor : mesh_.vertices(vertex)){
                     curvature[vertex] += curvature[neighboor];
                 }
                 // Average between the curvature of the vertex and all its neighbors. So there are valence + 1 points.
-                curvature[vertex]/=valence+1;
+
+                curvature[vertex]/=valence+1.0;
+
             }
         }
+        auto average_smoothed_curv = 0.0;
+        for(auto vertex : mesh_.vertices()) {
+            average_smoothed_curv += curvature[vertex];
+        }
+        average_smoothed_curv /= mesh_.n_vertices();
 
-        //TODO actual remeshing
-
+        for (auto vertex : mesh_.vertices())
+        {
+            //The user have no way to chose a mean length so I use this.
+            auto c = average_smoothed_curv/curvature[vertex];
+            target_length[vertex] *=  c;
+            //If he would, I would use this :
+            /*
+             * target_length[vertex]  = target_mean * average_smoothed_curv/curvature[vertex];
+             */
+        }
     }
     else if (remeshing_type == HEIGHT)
     {
@@ -328,7 +357,7 @@ void MeshProcessing::collapse_short_edges ()
 
     if (i == 100) std::cerr << "collapse break\n";
 }
-    
+
 unsigned int MeshProcessing::get_ideal_valence(Mesh::Vertex vertex) const
 {
     return mesh_.is_boundary(vertex) ? 4 : 6;
@@ -810,7 +839,7 @@ void MeshProcessing::compute_mesh_properties() {
     calc_mean_curvature();
     calc_gauss_curvature();
     color_coding(vertex_valence, &mesh_, v_color_valence, 3 /* min */,
-                                                          8 /* max */);
+                 8 /* max */);
     color_coding(v_unicurvature, &mesh_, v_color_unicurvature);
     color_coding(v_curvature, &mesh_, v_color_curvature);
     color_coding(v_gauss_curvature, &mesh_, v_color_gaussian_curv);
@@ -843,35 +872,35 @@ void MeshProcessing::compute_mesh_properties() {
     j = 0;
     for (auto v: mesh_.vertices()) {
         points_.col(j) << mesh_.position(v).x,
-                          mesh_.position(v).y,
-                          mesh_.position(v).z;
+                mesh_.position(v).y,
+                mesh_.position(v).z;
 
         normals_.col(j) << vertex_normal[v].x,
-                           vertex_normal[v].y,
-                           vertex_normal[v].z;
+                vertex_normal[v].y,
+                vertex_normal[v].z;
 
         color_valence_.col(j) << v_color_valence[v].x,
-                                 v_color_valence[v].y,
-                                 v_color_valence[v].z;
+                v_color_valence[v].y,
+                v_color_valence[v].z;
 
         color_unicurvature_.col(j) << v_color_unicurvature[v].x,
-                                      v_color_unicurvature[v].y,
-                                      v_color_unicurvature[v].z;
+                v_color_unicurvature[v].y,
+                v_color_unicurvature[v].z;
 
         color_curvature_.col(j) << v_color_curvature[v].x,
-                                   v_color_curvature[v].y,
-                                   v_color_curvature[v].z;
+                v_color_curvature[v].y,
+                v_color_curvature[v].z;
 
         color_gaussian_curv_.col(j) << v_color_gaussian_curv[v].x,
-                                       v_color_gaussian_curv[v].y,
-                                       v_color_gaussian_curv[v].z;
+                v_color_gaussian_curv[v].y,
+                v_color_gaussian_curv[v].z;
         ++j;
     }
 }
 
 void MeshProcessing::color_coding(Mesh::Vertex_property<Scalar> prop, Mesh *mesh,
-                  Mesh::Vertex_property<Color> color_prop, Scalar min_value,
-                  Scalar max_value, int bound) {
+                                  Mesh::Vertex_property<Color> color_prop, Scalar min_value,
+                                  Scalar max_value, int bound) {
     // Get the value array
     std::vector<Scalar> values = prop.vector();
 
@@ -892,7 +921,7 @@ void MeshProcessing::color_coding(Mesh::Vertex_property<Scalar> prop, Mesh *mesh
 }
 
 void MeshProcessing::set_color(Mesh::Vertex v, const Color& col,
-               Mesh::Vertex_property<Color> color_prop)
+                               Mesh::Vertex_property<Color> color_prop)
 {
     color_prop[v] = col;
 }
