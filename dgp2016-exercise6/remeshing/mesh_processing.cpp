@@ -93,22 +93,6 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
     }
     else if (remeshing_type == CURV)
     {
-
-        length = 0;
-        int n = 0;
-        for (auto edge: mesh_.edges()) {
-            length += mesh_.edge_length(edge);
-            n++;
-        }
-        if (n == 0)
-            length = 1;
-        else
-            length /= n;
-        length *= 0.8;
-        for (auto vertex: mesh_.vertices()) {
-            target_length[vertex] = length;
-        }
-
         //Only one of these is useful
         calc_mean_curvature();
         calc_gauss_curvature();
@@ -135,6 +119,7 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
         average_smoothed_curv /= mesh_.n_vertices();
         for (auto vertex : mesh_.vertices())
         {
+           //if the point curvature is average, c will be 1 so this point target length will be the average.
            auto c = average_smoothed_curv/curvature[vertex];
            target_length[vertex]  = target_mean * c;
         }
