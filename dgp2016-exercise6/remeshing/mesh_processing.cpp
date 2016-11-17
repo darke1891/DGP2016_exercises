@@ -62,9 +62,13 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
     Scalar                   H;
     Scalar                   K;
 
-    int curvatureSmoothing = 1; //Number of time the curvature is smoothed before being used for remeshing.
+
+    Scalar target_mean = 2;
+
+    int curvatureSmoothing = 2; //Number of time the curvature is smoothed before being used for remeshing.
 
     Mesh::Vertex_property<Scalar> curvature = mesh_.vertex_property<Scalar>("v:curvature", 0);
+    Mesh::Vertex_property<Scalar> uniform_curvature = mesh_.vertex_property<Scalar>("v:unicurvature", 0);
     Mesh::Vertex_property<Scalar> gauss_curvature = mesh_.vertex_property<Scalar>("v:gausscurvature", 0);
     Mesh::Vertex_property<Scalar> target_length = mesh_.vertex_property<Scalar>("v:length", 0);
     Mesh::Vertex_property<Scalar> target_new_length  = mesh_.vertex_property<Scalar>("v:newlength", 0);
@@ -107,7 +111,9 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
 
         //Only one of these is useful
         calc_mean_curvature();
-        cout <<"a"<<endl;
+        calc_gauss_curvature();
+        calc_uniform_mean_curvature();
+
         //Smooth curvature
         for(int i = 0; i < curvatureSmoothing;i++){
             for(auto vertex : mesh_.vertices()) {
@@ -127,16 +133,10 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
             average_smoothed_curv += curvature[vertex];
         }
         average_smoothed_curv /= mesh_.n_vertices();
-
         for (auto vertex : mesh_.vertices())
         {
-            //The user have no way to chose a mean length so I use this.
-            auto c = average_smoothed_curv/curvature[vertex];
-            target_length[vertex] *=  c;
-            //If he would, I would use this :
-            /*
-             * target_length[vertex]  = target_mean * average_smoothed_curv/curvature[vertex];
-             */
+           auto c = average_smoothed_curv/curvature[vertex];
+           target_length[vertex]  = target_mean * c;
         }
     }
     else if (remeshing_type == HEIGHT)
