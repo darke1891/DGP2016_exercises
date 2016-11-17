@@ -72,41 +72,18 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
 
     if (remeshing_type == AVERAGE)
     {
-        bool global_average = true;
-        if (global_average) {
-            length = 0;
-            int n = 0;
-            for (auto edge: mesh_.edges()) {
-                length += mesh_.edge_length(edge);
-                n++;
-            }
-            if (n == 0)
-                length = 1;
-            else
-                length /= n;
-            for (auto vertex: mesh_.vertices()) {
-                target_length[vertex] = length;
-            }
+        length = 0;
+        int n = 0;
+        for (auto edge: mesh_.edges()) {
+            length += mesh_.edge_length(edge);
+            n++;
         }
-        else {
-            for (auto vertex : mesh_.vertices())
-            {
-                length = 0;
-                auto const vertex_valence = mesh_.valence(vertex);
-                
-                if (vertex_valence == 0)
-                {
-                    target_length[vertex] = 1;
-                    continue;
-                }
-                
-                for (auto halfedge : mesh_.halfedges(vertex))
-                {
-                    auto edge = mesh_.edge(halfedge);
-                    length += mesh_.edge_length(edge);
-                }
-                target_length[vertex] = length / vertex_valence;
-            }
+        if (n == 0)
+            length = 1;
+        else
+            length /= n;
+        for (auto vertex: mesh_.vertices()) {
+            target_length[vertex] = length;
         }
     }
     else if (remeshing_type == CURV)
@@ -134,7 +111,32 @@ void MeshProcessing::calc_target_length (const REMESHING_TYPE &remeshing_type)
     }
     else if (remeshing_type == HEIGHT)
     {
-
+        length = 0;
+        int n = 0;
+        for (auto edge: mesh_.edges()) {
+            length += mesh_.edge_length(edge);
+            n++;
+        }
+        if (n == 0)
+            length = 1;
+        else
+            length /= n;
+        Scalar min, max;
+        auto vertex0 = *(mesh_.vertices().begin());
+        min = mesh_.position(vertex0)[1];
+        max = mesh_.position(vertex0)[1];
+        for (auto vertex: mesh_.vertices()) {
+            Scalar h = mesh_.position(vertex)[1];
+            if (min > h)
+                min = h;
+            if (max < h)
+                max = h;
+        }
+        for (auto vertex: mesh_.vertices()) {
+            Scalar h = mesh_.position(vertex)[1];
+            Scalar scale = (h - min) / (max - min) * 4 + 1;
+            target_length[vertex] = length * scale;
+        }
     }
 
 }
