@@ -252,8 +252,6 @@ bool MeshProcessing::check_collapse_ok(Mesh::Halfedge v0v1) {
         if ((vv == v1) || (vv2 == v1))
             continue;
         auto n0 = calc_triangle_norm(mesh_.position(v0), mesh_.position(vv), mesh_.position(vv2));
-        //if (norm(n0) < small_triangle)
-        //    return false;
         auto n1 = calc_triangle_norm(mesh_.position(v1), mesh_.position(vv), mesh_.position(vv2));
         if ((norm(n1) < norm(n0)) && (norm(n1) < small_triangle))
             return false;
