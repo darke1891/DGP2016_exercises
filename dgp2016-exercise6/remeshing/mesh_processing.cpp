@@ -21,6 +21,7 @@ using surface_mesh::Color;
 using surface_mesh::Vec3;
 using surface_mesh::Normal;
 using surface_mesh::cross;
+using surface_mesh::norm;
 using std::min;
 using std::max;
 using std::cout;
@@ -449,6 +450,19 @@ void MeshProcessing::calc_uniform_mean_curvature() {
     // the length of the uniform Laplacian approximation
     // Save your approximation in unicurvature vertex property of the mesh.
     // ------------- IMPLEMENT HERE ---------
+
+    for (auto vertex: mesh_.vertices()) {
+        if (mesh_.is_boundary(vertex))
+            continue;
+        int n = mesh_.valence(vertex);
+        if (n == 0)
+            continue;
+        Vec3 v_sum(0,0,0);
+        for (auto neighbor_vertex: mesh_.vertices(vertex))
+            v_sum += mesh_.position(neighbor_vertex) - mesh_.position(vertex);
+        v_sum /= n;
+        v_unicurvature[vertex] = norm(v_sum) / 2;
+    }
 }
 
 // ========================================================================
@@ -467,6 +481,23 @@ void MeshProcessing::calc_mean_curvature() {
     // Save your approximation in v_curvature vertex property of the mesh.
     // Use the weights from calc_weights(): e_weight and v_weight
     // ------------- IMPLEMENT HERE ---------
+
+    calc_weights();
+    for (auto vertex: mesh_.vertices()) {
+        if (mesh_.is_boundary(vertex))
+            continue;
+        int n = mesh_.valence(vertex);
+        if (n == 0)
+            continue;
+        Vec3 v_sum(0,0,0);
+        for (auto halfedge: mesh_.halfedges(vertex)) {
+            auto edge = mesh_.edge(halfedge);
+            auto neighbor = mesh_.to_vertex(halfedge);
+            v_sum += e_weight[edge] * (mesh_.position(neighbor) - mesh_.position(vertex));
+        }
+        v_sum *= v_weight[vertex];
+        v_curvature[vertex] = norm(v_sum);
+    }
 }
 
 // ========================================================================
@@ -484,6 +515,27 @@ void MeshProcessing::calc_gauss_curvature() {
     // you pass to the acos function is between -1.0 and 1.0.
     // Use the v_weight property for the area weight.
     // ------------- IMPLEMENT HERE ---------
+
+    calc_vertices_weights();
+    for (auto vertex: mesh_.vertices()) {
+        if (mesh_.is_boundary(vertex))
+            continue;
+        Scalar sum = 2 * M_PI;
+        for (auto face: mesh_.faces(vertex)) {
+            Scalar l[3];
+            for (auto face_edge: mesh_.halfedges(face)){
+                if (mesh_.to_vertex(face_edge) == vertex)
+                    l[0] = mesh_.edge_length(mesh_.edge(face_edge));
+                else if (mesh_.from_vertex(face_edge) == vertex)
+                    l[1] = mesh_.edge_length(mesh_.edge(face_edge));
+                else
+                    l[2] = mesh.edge_length(mesh.edge(face_edge));
+            }
+            std::complex<double> z((l[0] * l[0] + l[1] * l[1] - l[2] * l[2]) / 2 / l[0] / l[1], 0);
+            sum -= acos(z).real();
+        }
+        v_gauss_curvature[vertex] = sum * 2 * v_weight[vertex];
+    }
 }
 
 
