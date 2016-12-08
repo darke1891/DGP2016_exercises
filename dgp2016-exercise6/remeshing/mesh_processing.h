@@ -55,6 +55,14 @@ public:
     void calc_mean_curvature();
     void calc_uniform_mean_curvature();
     void calc_gauss_curvature();
+    
+public:
+    void delete_marked_vertices();
+private:
+    static surface_mesh::Color const deletion_mark_;
+private:
+    void mark_to_delete(Mesh::Vertex vertex);
+    bool is_marked_to_delete(Mesh::Vertex vertex);
 
 private:
     void calc_weights();
