@@ -587,6 +587,34 @@ void MeshProcessing::tangential_relaxation ()
     mesh_.update_face_normals();
     mesh_.update_vertex_normals();
 }
+    
+surface_mesh::Color const MeshProcessing::deletion_mark_ = surface_mesh::Color(0.98, 0.59, 0.04);
+
+void MeshProcessing::delete_marked_vertices()
+{
+    std::cout << "Number of vertices before deletion is " << mesh_.n_vertices() << std::endl;
+
+    for (auto vertex: mesh_.vertices())
+    {
+        if (is_marked_to_delete(vertex)) mesh_.delete_vertex(vertex);
+    }
+
+    std::cout << "Number of vertices after deletion is " << mesh_.n_vertices() << std::endl;
+
+    mesh_.garbage_collection();
+}
+
+void MeshProcessing::mark_to_delete(Mesh::Vertex vertex)
+{
+    Mesh::Vertex_property<Color> colors = mesh_.vertex_property<Color>("v:color");
+    colors[vertex] = deletion_mark_;
+}
+
+bool MeshProcessing::is_marked_to_delete(Mesh::Vertex vertex)
+{
+    Mesh::Vertex_property<Color> colors = mesh_.vertex_property<Color>("v:color");
+    return colors[vertex] == deletion_mark_;
+}
 
 // ========================================================================
 // EXERCISE 1.1
