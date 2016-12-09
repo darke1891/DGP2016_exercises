@@ -588,32 +588,53 @@ void MeshProcessing::tangential_relaxation ()
     mesh_.update_vertex_normals();
 }
     
-surface_mesh::Color const MeshProcessing::deletion_mark_ = surface_mesh::Color(0.98, 0.59, 0.04);
+surface_mesh::Color const MeshProcessing::non_deletion_mark_ = surface_mesh::Color(1.0, 1.0, 1.0);
 
-void MeshProcessing::delete_marked_vertices()
+void MeshProcessing::delete_marked_faces()
 {
-    std::cout << "Number of vertices before deletion is " << mesh_.n_vertices() << std::endl;
+    std::vector<Mesh::Face> marked_faces;
+    marked_faces.reserve(mesh_.n_faces());
 
-    for (auto vertex: mesh_.vertices())
+    for (auto face : mesh_.faces())
     {
-        if (is_marked_to_delete(vertex)) mesh_.delete_vertex(vertex);
+        if (is_marked_to_delete(face)) marked_faces.push_back(face);
     }
 
-    std::cout << "Number of vertices after deletion is " << mesh_.n_vertices() << std::endl;
+    marked_faces.shrink_to_fit();
+
+    for (auto face : marked_faces)
+    {
+        mesh_.delete_face(face);
+    }
 
     mesh_.garbage_collection();
-}
-
-void MeshProcessing::mark_to_delete(Mesh::Vertex vertex)
-{
-    Mesh::Vertex_property<Color> colors = mesh_.vertex_property<Color>("v:color");
-    colors[vertex] = deletion_mark_;
 }
 
 bool MeshProcessing::is_marked_to_delete(Mesh::Vertex vertex)
 {
     Mesh::Vertex_property<Color> colors = mesh_.vertex_property<Color>("v:color");
-    return colors[vertex] == deletion_mark_;
+    return colors[vertex] != non_deletion_mark_;
+}
+
+bool MeshProcessing::is_marked_to_delete(Mesh::Face face)
+{
+    if (mesh_.is_deleted(face))
+    {
+        return false;
+    }
+
+    unsigned int marked_vertices_count = 0;
+
+    for (auto vertex : mesh_.vertices(face))
+    {
+        if (is_marked_to_delete(vertex)) ++marked_vertices_count;
+    }
+
+    // We assume that we deal with a triangular mesh.
+    // Therefore, if more than one vertex out of three
+    // is marked, then we mark the face as deleted.
+    //
+    return marked_vertices_count > 1;
 }
 
 // ========================================================================
@@ -819,6 +840,14 @@ void MeshProcessing::load_mesh(const string &filename) {
 
     // Store the original mesh, this might be useful for some computations
     mesh_init_ = mesh_;
+}
+    
+void MeshProcessing::save_mesh()
+{
+    bool const written_successfully = mesh_.write("processed_geralt.off");
+
+    if (written_successfully) std::cout << "Saved successfully" << std::endl;
+    else                      std::cout << "Saving failed" << std::endl;
 }
 
 void MeshProcessing::compute_mesh_properties() {
