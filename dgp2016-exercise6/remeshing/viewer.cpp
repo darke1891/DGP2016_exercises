@@ -373,8 +373,12 @@ Viewer::Viewer() : nanogui::Screen(Eigen::Vector2i(1024, 768), "DGP Viewer") {
     
     b = new Button(window_, "Deleting");
     b->setCallback([this]() {
-        this->mesh_->delete_marked_vertices();
-        this->refresh_mesh();
+        this->mesh_->delete_marked_faces();
+    });
+
+    b = new Button(window_, "Saving");
+    b->setCallback([this]() {
+        this->mesh_->save_mesh();
     });
 
     performLayout();
