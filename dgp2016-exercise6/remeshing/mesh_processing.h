@@ -50,6 +50,7 @@ public:
     void tangential_relaxation ();
 
     void load_mesh(const string& filename);
+    void save_mesh();
     void compute_mesh_properties();
 
     void calc_mean_curvature();
@@ -57,12 +58,12 @@ public:
     void calc_gauss_curvature();
     
 public:
-    void delete_marked_vertices();
+    void delete_marked_faces();
 private:
-    static surface_mesh::Color const deletion_mark_;
+    static surface_mesh::Color const non_deletion_mark_;
 private:
-    void mark_to_delete(Mesh::Vertex vertex);
     bool is_marked_to_delete(Mesh::Vertex vertex);
+    bool is_marked_to_delete(Mesh::Face face);
 
 private:
     void calc_weights();
