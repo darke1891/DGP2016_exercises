@@ -371,12 +371,16 @@ Viewer::Viewer() : nanogui::Screen(Eigen::Vector2i(1024, 768), "DGP Viewer") {
         this->refresh_mesh();
     });
     
-    b = new Button(window_, "Deleting");
+    new Label(window_, "Geralt of Rivia", "sans-bold");
+
+    b = new Button(window_, "Make blood vessels");
     b->setCallback([this]() {
         this->mesh_->delete_marked_faces();
+        this->mesh_->compute_mesh_properties();
+        this->refresh_mesh();
     });
 
-    b = new Button(window_, "Saving");
+    b = new Button(window_, "Save");
     b->setCallback([this]() {
         this->mesh_->save_mesh();
     });
