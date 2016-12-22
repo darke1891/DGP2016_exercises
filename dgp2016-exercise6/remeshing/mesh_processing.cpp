@@ -613,13 +613,13 @@ void MeshProcessing::delete_marked_faces()
     mesh_.garbage_collection();
 }
 
-bool MeshProcessing::is_marked_to_delete(Mesh::Vertex vertex)
+bool MeshProcessing::is_marked(Mesh::Vertex vertex)
 {
     Mesh::Vertex_property<Color> colors = mesh_.vertex_property<Color>("v:color");
-    return colors[vertex] != non_deletion_mark_;
+    return colors[vertex] != non_mark_;
 }
 
-bool MeshProcessing::is_marked_to_delete(Mesh::Face face)
+bool MeshProcessing::is_marked(Mesh::Face face)
 {
     if (mesh_.is_deleted(face))
     {
