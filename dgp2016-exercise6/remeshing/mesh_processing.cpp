@@ -588,7 +588,7 @@ void MeshProcessing::tangential_relaxation ()
     mesh_.update_vertex_normals();
 }
     
-surface_mesh::Color const MeshProcessing::non_deletion_mark_ = surface_mesh::Color(1.0, 1.0, 1.0);
+surface_mesh::Color const MeshProcessing::non_mark_ = surface_mesh::Color(1.0, 1.0, 1.0);
 
 void MeshProcessing::delete_marked_faces()
 {
@@ -597,14 +597,17 @@ void MeshProcessing::delete_marked_faces()
 
     for (auto face : mesh_.faces())
     {
-        if (is_marked_to_delete(face)) marked_faces.push_back(face);
+        if (is_marked(face)) marked_faces.push_back(face);
     }
 
     marked_faces.shrink_to_fit();
 
     for (auto face : marked_faces)
     {
-        mesh_.delete_face(face);
+        if (!mesh_.is_deleted(face))
+        {
+            mesh_.delete_face(face);
+        }
     }
 
     mesh_.garbage_collection();
@@ -627,7 +630,7 @@ bool MeshProcessing::is_marked_to_delete(Mesh::Face face)
 
     for (auto vertex : mesh_.vertices(face))
     {
-        if (is_marked_to_delete(vertex)) ++marked_vertices_count;
+        if (is_marked(vertex)) ++marked_vertices_count;
     }
 
     // We assume that we deal with a triangular mesh.
