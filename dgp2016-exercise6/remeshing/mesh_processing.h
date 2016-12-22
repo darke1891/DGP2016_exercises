@@ -60,10 +60,10 @@ public:
 public:
     void delete_marked_faces();
 private:
-    static surface_mesh::Color const non_deletion_mark_;
+    static surface_mesh::Color const non_mark_;
 private:
-    bool is_marked_to_delete(Mesh::Vertex vertex);
-    bool is_marked_to_delete(Mesh::Face face);
+    bool is_marked(Mesh::Vertex vertex);
+    bool is_marked(Mesh::Face face);
 
 private:
     void calc_weights();
