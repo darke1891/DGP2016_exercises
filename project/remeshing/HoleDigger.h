@@ -1,0 +1,28 @@
+#pragma once
+#include <vector>
+#include <string>
+#include <set>
+#include "mesh_processing.h"
+
+class HoleDigger
+{
+public:
+  HoleDigger(surface_mesh::Surface_mesh &diggedMesh);
+  HoleDigger(void);
+  ~HoleDigger();
+
+  void read(std::string name);
+  void save(std::string name);
+  void sample(double distance);
+  void digHole(double distance);
+  void octreeSample(double distance, std::vector<surface_mesh::Surface_mesh::Vertex> &input,
+                    std::vector<surface_mesh::Surface_mesh::Vertex> &to_pick);
+  surface_mesh::Surface_mesh::Vertex findNearest(surface_mesh::Point center,
+                                                 std::vector<surface_mesh::Surface_mesh::Vertex> &range);
+
+  std::vector<int> sample_points;
+  std::vector<std::pair<double, int> > dis_to_sample;
+
+  surface_mesh::Surface_mesh & mesh;
+};
+
